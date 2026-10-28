@@ -1,0 +1,304 @@
+<!DOCTYPE html><html><head><base target="_top"><?!= include('Styles') ?>
+<style>
+/* Exchange Office Staff portal (Oct 2026). Uses the shared colours in Styles, so dark mode works too. */
+.sp-wrap{max-width:1180px}
+.sp-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:0 0 16px}
+.sp-stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;
+  text-align:left;font:inherit;color:var(--ink);transition:border-color .15s,box-shadow .15s}
+.sp-stat:hover{border-color:var(--navy)}
+.sp-stat.on{border-color:var(--navy);box-shadow:0 0 0 2px var(--navy) inset}
+.sp-stat b{display:block;font-size:24px;line-height:1.1}
+.sp-stat span{font-size:12px;color:var(--muted)}
+.sp-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:12px}
+.sp-filters label{display:block;font-size:12px;color:var(--muted);margin:0 0 3px}
+.sp-filters select,.sp-search input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:7px;
+  font:inherit;background:var(--card);color:var(--ink)}
+.sp-search{position:relative}
+.sp-search input{padding-left:36px;font-size:16px}
+.sp-search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.55}
+.sp-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:14px 0 10px}
+.sp-bar .sp{flex:1}
+.sp-count{font-size:14px;color:var(--muted)}
+.sp-list{display:flex;flex-direction:column;gap:10px}
+.sp-row{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+  display:grid;grid-template-columns:minmax(0,2.1fr) minmax(0,2fr) minmax(0,1.5fr) auto;gap:6px 18px;align-items:center}
+.sp-row:hover{border-color:#c9bfbc}
+.sp-name{font-weight:700;font-size:15px}
+.sp-sub{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.sp-uni{font-weight:600}
+.sp-acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.sp-acts a{text-decoration:none;white-space:nowrap}
+.sp-pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.3px;padding:3px 9px;border-radius:999px;
+  background:var(--pend-bg);color:var(--pend);margin:0 0 5px}
+.sp-pill.s1{background:#eef2ff;color:#3346a8}
+.sp-pill.s2{background:var(--warn-bg);color:var(--warn)}
+.sp-pill.s3{background:#f1ebff;color:#5b3aa6}
+.sp-pill.sg{background:#e7f4fb;color:#0b5f86}
+.sp-pill.ok{background:var(--ok-bg);color:var(--ok)}
+.sp-pill.bad{background:var(--bad-bg);color:var(--bad)}
+html[data-theme="dark"] .sp-pill.s1{background:#1d2340;color:#aab8ff}
+html[data-theme="dark"] .sp-pill.s3{background:#261d3a;color:#c7b2ff}
+html[data-theme="dark"] .sp-pill.sg{background:#10283a;color:#8fd0f0}
+.sp-prog{height:6px;border-radius:99px;background:var(--line);overflow:hidden;display:flex;margin:4px 0 2px;max-width:220px}
+.sp-prog i{display:block;height:100%}
+.sp-prog .a{background:var(--ok)} .sp-prog .d{background:var(--bad)} .sp-prog .p{background:#d9a441}
+.sp-empty{text-align:center;padding:36px 16px;color:var(--muted)}
+.sp-more{display:block;margin:14px auto 0}
+.sp-link{background:none;border:0;color:var(--navy);font:inherit;cursor:pointer;padding:0;text-decoration:underline}
+html[data-theme="dark"] .sp-link{color:#9db7f0}
+.sp-who{font-size:13px;opacity:.85;margin-top:6px}
+@media (max-width:820px){
+  .sp-row{grid-template-columns:1fr}
+  .sp-acts{justify-content:flex-start}
+}
+</style>
+</head><body>
+<div class="brand"><div class="wrap sp-wrap"><img src="<?!= logoDataUri_() ?>" alt="Institution logo" width="327" height="36"></div></div>
+<header class="top"><div class="wrap sp-wrap">
+  <div class="eyebrow">International Exchange Office</div>
+  <h1>Exchange Office Staff portal - Course Permission Forms</h1>
+  <div class="sp-who" id="who"></div>
+</div></header>
+
+<div class="wrap sp-wrap">
+  <div id="err" class="err"></div>
+
+  <div id="loading" class="card center">Loading forms…</div>
+
+  <div id="main" style="display:none">
+    <!-- Quick filters by step. Clicking one filters the list; clicking it again clears it. -->
+    <div class="sp-stats" id="stats"></div>
+
+    <div class="card">
+      <div class="sp-search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="q" type="search" autocomplete="off" placeholder="Search name, student ID, email, reference, university, major…" aria-label="Search forms">
+      </div>
+      <div class="sp-filters">
+        <div><label for="fSeason">Semester</label><select id="fSeason"></select></div>
+        <div><label for="fYear">Year</label><select id="fYear"></select></div>
+        <div><label for="fUni">Host university</label><select id="fUni"></select></div>
+        <div><label for="fCollege">College</label><select id="fCollege"></select></div>
+        <div><label for="fMajor">Major</label><select id="fMajor"></select></div>
+        <div><label for="fStatus">Status</label><select id="fStatus"></select></div>
+        <div><label for="fSort">Sort by</label><select id="fSort">
+          <option value="updated">Last activity (newest first)</option>
+          <option value="started">Date started (newest first)</option>
+          <option value="name">Student name (A-Z)</option>
+          <option value="university">Host university (A-Z)</option>
+          <option value="ref">Reference</option>
+        </select></div>
+      </div>
+    </div>
+
+    <div class="sp-bar">
+      <span class="sp-count" id="count"></span>
+      <span class="sp"></span>
+      <button class="btn sec sm" id="clearBtn" type="button">Clear filters</button>
+      <button class="btn sec sm" id="refreshBtn" type="button">Refresh</button>
+    </div>
+
+    <div class="sp-list" id="list"></div>
+    <button class="btn sec sp-more" id="moreBtn" type="button" style="display:none">Show more</button>
+
+    <div id="ownCard" class="card" style="display:none;margin-top:22px">
+      <h2>Your own forms</h2>
+      <p class="muted">Forms where you are the student.</p>
+      <div id="ownList"></div>
+    </div>
+
+    <p class="muted" style="margin-top:22px">
+      Forms open in a new tab, exactly as the student sees them. You can view every page and press
+      <b>Send reminder now</b>; you can only act on the Exchange Office steps.
+      Need a CPF for yourself? <a id="newLink" href="#" target="_top">Start a new form</a>.
+    </p>
+  </div>
+</div>
+
+<?!= clientScript_(P) ?>
+<script>
+var ALL = [], SHOWN = 0, PAGE_SIZE = 100, STEP = '';
+var FILTERS = ['fSeason', 'fYear', 'fUni', 'fCollege', 'fMajor', 'fStatus'];
+
+// Step groups for the quick-filter tiles and the coloured status pills.
+var GROUPS = [
+  { key: '',     label: 'All forms',      test: function () { return true; } },
+  { key: 'S1',   label: 'Step I',         test: function (f) { return f.status === P.ST.STEP1; } },
+  { key: 'S2',   label: 'Step II',        test: function (f) { return f.status === P.ST.COURSES; } },
+  { key: 'S3',   label: 'Step III / IV',  test: function (f) { return f.status === P.ST.GATED; } },
+  { key: 'SG',   label: 'Awaiting student signature', test: function (f) { return f.status === P.ST.SIGNING; } },
+  { key: 'DONE', label: 'Completed',      test: function (f) { return f.status === P.ST.COMPLETED; } },
+  { key: 'END',  label: 'Denied / cancelled', test: function (f) { return f.status === P.ST.DENIED || f.status === P.ST.CANCELLED; } }
+];
+
+function pillFor(status) {
+  var c = status === P.ST.STEP1 ? 's1' : status === P.ST.COURSES ? 's2' : status === P.ST.GATED ? 's3' :
+    status === P.ST.SIGNING ? 'sg' : status === P.ST.COMPLETED ? 'ok' :
+    (status === P.ST.DENIED || status === P.ST.CANCELLED) ? 'bad' : '';
+  return '<span class="sp-pill ' + c + '">' + esc(status || 'UNKNOWN') + '</span>';
+}
+
+function uniq(field) {
+  var seen = {}, out = [];
+  ALL.forEach(function (f) { var v = f[field]; if (v && !seen[v]) { seen[v] = 1; out.push(v); } });
+  return out.sort(function (a, b) { return String(a).localeCompare(String(b)); });
+}
+
+function fillSelect(id, label, values) {
+  var cur = $(id).value;
+  $(id).innerHTML = '<option value="">' + esc(label) + '</option>' + values.map(function (v) {
+    return '<option' + (String(v) === cur ? ' selected' : '') + '>' + esc(v) + '</option>';
+  }).join('');
+}
+
+function buildFilters() {
+  fillSelect('fSeason', 'All semesters', uniq('season'));
+  fillSelect('fYear', 'All years', uniq('year').reverse());
+  fillSelect('fUni', 'All universities', uniq('university'));
+  fillSelect('fCollege', 'All colleges', uniq('college'));
+  fillSelect('fMajor', 'All majors', uniq('major'));
+  // Every status the workflow uses, plus any other value found on the sheet.
+  var st = (window.STATUSES || []).slice();
+  uniq('status').forEach(function (s) { if (st.indexOf(s) === -1) st.push(s); });
+  fillSelect('fStatus', 'All statuses', st);
+}
+
+function norm(s) { return String(s == null ? '' : s).toLowerCase(); }
+
+function haystack(f) {
+  return norm([f.name, f.studentId, f.email, f.ref, f.university, f.country, f.major, f.college,
+    f.semester, f.status, f.waitingOn].join(' | '));
+}
+
+/** Everything except the step tile; the tiles count within these results. */
+function baseMatches() {
+  var terms = norm($('q').value).split(/\s+/).filter(Boolean);
+  var want = {
+    season: $('fSeason').value, year: $('fYear').value, university: $('fUni').value,
+    college: $('fCollege').value, major: $('fMajor').value, status: $('fStatus').value
+  };
+  return ALL.filter(function (f) {
+    for (var k in want) if (want[k] && String(f[k]) !== want[k]) return false;
+    if (!terms.length) return true;
+    var h = f._h || (f._h = haystack(f));
+    return terms.every(function (t) { return h.indexOf(t) > -1; });
+  });
+}
+
+function sortList(list) {
+  var by = $('fSort').value;
+  var cmp = {
+    updated: function (a, b) { return b.updatedMs - a.updatedMs; },
+    started: function (a, b) { return b.startedMs - a.startedMs; },
+    name: function (a, b) { return a.name.localeCompare(b.name); },
+    university: function (a, b) { return a.university.localeCompare(b.university) || a.name.localeCompare(b.name); },
+    ref: function (a, b) { return a.ref.localeCompare(b.ref, undefined, { numeric: true }); }
+  }[by] || function () { return 0; };
+  return list.slice().sort(cmp);
+}
+
+function renderStats(base) {
+  $('stats').innerHTML = GROUPS.map(function (g) {
+    var n = base.filter(g.test).length;
+    return '<button type="button" class="sp-stat' + (STEP === g.key ? ' on' : '') + '" data-step="' + g.key + '">' +
+      '<b>' + n + '</b><span>' + esc(g.label) + '</span></button>';
+  }).join('');
+  Array.prototype.forEach.call(document.querySelectorAll('.sp-stat'), function (b) {
+    b.onclick = function () {
+      var k = b.getAttribute('data-step');
+      STEP = (STEP === k) ? '' : k;
+      render();
+    };
+  });
+}
+
+function progress(c) {
+  if (!c || !c.total) return '<div class="sp-sub">No courses yet</div>';
+  var w = function (n) { return (100 * n / c.total).toFixed(1) + '%'; };
+  var bits = [c.approved + ' approved'];
+  if (c.pending) bits.push(c.pending + ' waiting');
+  if (c.denied) bits.push(c.denied + ' denied');
+  if (c.draft) bits.push(c.draft + ' draft');
+  return '<div class="sp-prog" title="' + esc(bits.join(', ')) + '">' +
+    '<i class="a" style="width:' + w(c.approved) + '"></i><i class="p" style="width:' + w(c.pending) + '"></i>' +
+    '<i class="d" style="width:' + w(c.denied) + '"></i></div>' +
+    '<div class="sp-sub">' + c.total + ' course' + (c.total === 1 ? '' : 's') + ': ' + esc(bits.join(', ')) + '</div>';
+}
+
+function rowHtml(f) {
+  return '<div class="sp-row">' +
+    '<div><div class="sp-name">' + esc(f.name || '(no name)') + '</div>' +
+      '<div class="sp-sub">' + esc(f.studentId) + (f.studentId && f.email ? ' · ' : '') + esc(f.email) + '</div>' +
+      '<div class="sp-sub">' + esc([f.major, f.college].filter(Boolean).join(' · ')) + '</div></div>' +
+    '<div><div class="sp-uni">' + esc(f.university) + '</div>' +
+      '<div class="sp-sub">' + esc([f.country, f.semester].filter(Boolean).join(' · ')) + '</div>' +
+      '<div class="sp-sub">' + esc(f.ref) + (f.amendment ? ' · amendment ' + esc(f.amendment) : '') +
+        (f.updated ? ' · last activity ' + esc(f.updated) : '') + '</div></div>' +
+    '<div>' + pillFor(f.status) +
+      (f.waitingOn ? '<div class="sp-sub">Waiting on: ' + esc(f.waitingOn) + '</div>' : '') +
+      progress(f.courses) + '</div>' +
+    '<div class="sp-acts">' +
+      (f.stepOneUrl ? '<a class="btn sm" target="_blank" rel="noopener" href="' + esc(f.stepOneUrl) + '">Step I</a>' : '') +
+      '<a class="btn sm' + (f.stepOneUrl ? ' sec' : '') + '" target="_blank" rel="noopener" href="' + esc(f.url) + '">Open form</a>' +
+    '</div></div>';
+}
+
+function render(keepCount) {
+  var base = baseMatches();
+  renderStats(base);
+  var g = GROUPS.filter(function (x) { return x.key === STEP; })[0] || GROUPS[0];
+  var list = sortList(base.filter(g.test));
+  if (!keepCount) SHOWN = PAGE_SIZE;
+  $('count').textContent = list.length + ' of ' + ALL.length + ' form' + (ALL.length === 1 ? '' : 's');
+  $('list').innerHTML = list.length
+    ? list.slice(0, SHOWN).map(rowHtml).join('')
+    : '<div class="card sp-empty">No forms match. <button type="button" class="sp-link" id="emptyClear">Clear filters</button></div>';
+  if ($('emptyClear')) $('emptyClear').onclick = clearAll;
+  show('moreBtn', list.length > SHOWN);
+}
+
+function clearAll() {
+  $('q').value = '';
+  FILTERS.forEach(function (id) { $(id).value = ''; });
+  STEP = '';
+  render();
+}
+
+function load() {
+  setErr('');
+  return run('getStaffForms').then(function (r) {
+    ALL = (r && r.forms) || [];
+    window.STATUSES = (r && r.statuses) || [];
+    $('who').textContent = 'Signed in as ' + ((r && r.me) || '');
+    buildFilters();
+    show('loading', false);
+    show('main');
+    render();
+  }, function (e) {
+    show('loading', false);
+    setErr(e.message || String(e));
+  });
+}
+
+var timer;
+$('q').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(render, 120); });
+FILTERS.concat(['fSort']).forEach(function (id) { $(id).addEventListener('change', function () { render(); }); });
+$('clearBtn').onclick = clearAll;
+$('refreshBtn').onclick = function () { $('refreshBtn').disabled = true; load().then(function () { $('refreshBtn').disabled = false; }); };
+$('moreBtn').onclick = function () { SHOWN += PAGE_SIZE; render(true); };
+$('newLink').href = P.newFormUrl;
+
+load();
+
+// Staff who are also students (student workers) still see their own forms here.
+run('getMyForms').then(function (list) {
+  if (!list || !list.length) return;
+  $('ownList').innerHTML = list.map(function (f) {
+    return '<div class="row" style="margin:10px 0;gap:10px;align-items:center;flex-wrap:wrap">' +
+      '<div><b>' + esc(f.university) + '</b> · ' + esc(f.semester) + '<br><span class="muted">' + esc(f.ref) + ' · ' + esc(f.status) + '</span></div>' +
+      '<span class="sp"></span><a class="btn sm sec" style="text-decoration:none" target="_top" href="' + esc(f.url) + '">Open</a></div>';
+  }).join('');
+  show('ownCard');
+}, function () {});
+</script>
+</body></html>

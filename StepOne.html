@@ -1,0 +1,73 @@
+<!DOCTYPE html><html><head><base target="_top"><?!= include('Styles') ?></head><body>
+<div class="brand"><div class="wrap"><img src="<?!= logoDataUri_() ?>" alt="Institution logo" width="327" height="36"></div></div>
+<header class="top"><div class="wrap">
+  <div class="eyebrow">International Exchange Office</div>
+  <h1>Step I: Approval by Exchange Office</h1>
+</div></header>
+
+<div class="wrap">
+  <div id="err" class="err"></div>
+  <div id="loading" class="center">Loading…</div>
+
+  <div id="app" style="display:none">
+    <div class="note">Nothing can be sent to a head of department until Step I is signed.</div>
+    <div id="history"></div>
+
+    <div class="card" id="decide">
+      <h2>The host university</h2>
+      <div class="field"><label>1. Is an accredited higher education institution recognized by the country's Ministry of Education *</label>
+        <select id="s1_accredited"><option value="">Select…</option><option>Yes</option><option>No</option></select></div>
+      <div class="field"><label>2. Is an institution which Home University has a study abroad agreement with *</label>
+        <select id="s1_agreement"></select></div>
+      <div class="field"><label>3. Has the appropriate accreditation for the student's major (and concentration if any) *
+        <span class="hint">Yes: tick every accreditation that applies. Otherwise tick "No" or "N/A" on its own.</span></label>
+        <div id="s1_major_accreditation"></div></div>
+      <div class="field"><label>Comments / special requirements <span class="hint">required when declining; shown to the student</span></label>
+        <textarea id="s1_comments"></textarea></div>
+
+      <h2 style="margin-top:22px">Your decision</h2>
+      <div class="field"><label>Decision *</label>
+        <select id="decision">
+          <option value="">Select…</option>
+          <option value="APPROVE">Approve - the student may proceed to course approvals</option>
+          <option value="DENY">Decline - this host university cannot be used</option>
+        </select></div>
+      <div id="signature"></div>
+      <button class="btn" id="submit">Sign Step I</button>
+    </div>
+
+    <div class="card" id="already" style="display:none"><div class="note ok" id="alreadyMsg"></div></div>
+  </div>
+</div>
+
+<?!= clientScript_(P) ?>
+<script>
+var FIELDS = ['s1_accredited', 's1_agreement', 's1_comments', 'decision'];
+mountSignature('signature', 'Signature of Exchange Office');
+
+load('getStepOne', P.sid, P.t).then(function (d) {
+  renderHistory('history', d.history);
+  $('s1_agreement').innerHTML = opts(d.agreementTypes);
+  $('s1_major_accreditation').innerHTML = d.majorAccreditations.map(function (a) {
+    return '<label class="chk"><input type="checkbox" name="acc" value="' + esc(a) + '"><span>' + esc(a) + '</span></label>';
+  }).join('');
+  if (d.decided) finish('Step I was already signed by ' + (d.history && d.history.stepOne && d.history.stepOne.by || 'the Exchange Office') + '. No further action is needed.');
+}, function () {});
+
+$('submit').onclick = function () {
+  var d = {};
+  FIELDS.forEach(function (k) { d[k] = val(k); });
+  setErr('');
+  d.signature = signatureOrError('signature');
+  if (!d.signature) return;
+  d.s1_major_accreditation = Array.prototype.map.call(
+    document.querySelectorAll('input[name="acc"]:checked'), function (e) { return e.value; });
+  act('submitStepOne', P.sid, P.t, d).then(function (r) {
+    if (!r) return;
+    finish(r.declined
+      ? 'Recorded as declined. The student has been notified.'
+      : 'Step I signed. The student can now send courses to heads of department.');
+  });
+};
+</script>
+</body></html>

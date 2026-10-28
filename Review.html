@@ -1,0 +1,150 @@
+<!DOCTYPE html><html><head><base target="_top"><?!= include('Styles') ?></head><body>
+<div class="brand"><div class="wrap"><img src="<?!= logoDataUri_() ?>" alt="Institution logo" width="327" height="36"></div></div>
+<header class="top"><div class="wrap">
+  <div class="eyebrow">International Exchange Office</div>
+  <h1>Step II: Course approval request</h1>
+  <div id="who" class="eyebrow" style="margin-top:6px;opacity:.9"></div>
+</div></header>
+
+<div class="wrap">
+  <div id="err" class="err"></div>
+  <div id="okmsg" class="ok-msg"></div>
+  <div id="loading" class="center">Loading…</div>
+
+  <div id="app" style="display:none">
+    <div id="decide">
+      <div class="note">Decide each course below. You can approve some, decline others, forward a course to the
+        faculty member who teaches it for their review, or leave it on <b>Decide later</b> and come back with the same
+        link. One signature covers everything you submit.</div>
+      <div class="note warn" id="gradeNote"></div>
+      <div id="pending"></div>
+      <div class="card">
+        <h2>Head of the Department (HoD) or College/School Designate's Signature</h2>
+        <div id="signature"></div>
+        <p class="muted">Signing and submitting records these decisions in your name, with a timestamp, as
+        your electronic signature. The head of department, the College/School Designate or the department
+        assistant may sign; the role you sign in is recorded with the decision.</p>
+        <button class="btn" id="submit">Submit decisions</button>
+      </div>
+    </div>
+
+    <div class="card" id="already" style="display:none"><div class="note ok" id="alreadyMsg"></div></div>
+
+    <div class="card" id="decidedCard" style="display:none">
+      <h2>Forwarded and decided</h2>
+      <div id="decided"></div>
+    </div>
+
+    <h2 style="margin:26px 0 12px">What has been approved before you</h2>
+    <div id="history"></div>
+  </div>
+</div>
+
+<?!= clientScript_(P) ?>
+<script>
+var Q = { ref: P.sid, hod: P.hod, crs: P.c, t: P.t };
+var D = null;
+$('gradeNote').textContent = P.gradeRejectNote;
+mountSignature('signature', 'Your signature');
+
+function courseCard(c, i) {
+  var f = function (name) { return 'c' + i + '_' + name; };
+  return '<div class="card" data-course="' + esc(c.course_row_id) + '" data-i="' + i + '">' +
+    '<div class="row"><h2 style="margin:0">' + esc(c.host_course_code) + ' - ' + esc(c.host_course_name) +
+    ' <span class="muted">(' + esc(c.host_credits) + ' ' + esc(c.host_credit_system || 'cr') + ' at host' + (c.host_mode ? ' · ' + esc(c.host_mode) : '') + ')</span></h2><span class="sp"></span>' +
+    (c.host_syllabus_url
+      ? '<a class="btn sm sec" style="text-decoration:none" href="' + esc(c.host_syllabus_url) + '" target="_blank">Open syllabus' + (c.host_syllabus2_url ? ' 1' : '') + '</a>' +
+          (c.host_syllabus2_url ? ' <a class="btn sm sec" style="text-decoration:none" href="' + esc(c.host_syllabus2_url) + '" target="_blank">Open syllabus 2</a>' : '')
+      : '<span class="muted">No syllabus attached</span>') + '</div>' +
+    '<div class="meta muted" style="margin:4px 0 14px">' + esc(c.dept_name) + altCourseText(c) + '</div>' +
+    facultyPanel(c) +
+    '<div class="field" style="max-width:380px"><label>Decision</label>' +
+      '<select id="' + f('decision') + '" data-role="decision">' +
+      '<option value="">Decide later</option>' +
+      '<option value="APPROVE">Approve this substitution</option>' +
+      '<option value="DENY">Decline this substitution</option>' +
+      '<option value="FORWARD">Forward to a faculty member for review</option></select></div>' +
+    '<div id="' + f('home') + '" style="display:none">' + homeFieldsHtml(f, c, D.courseTypes, D.gerAreas) + '</div>' +
+    '<div id="' + f('fwd') + '" style="display:none"><div class="grid">' +
+      '<div class="field"><label>Faculty member\'s email *<span class="hint"> the professor who teaches the Home University course</span></label>' +
+        '<input id="' + f('faculty_email') + '" type="email" placeholder="name@' + esc(P.facultyDomain) + '"></div>' +
+      '<div class="field"><label>Note to the faculty member <span class="hint">optional</span></label>' +
+        '<input id="' + f('forward_note') + '"></div>' +
+    '</div><p class="muted" style="margin-top:0">They review the syllabus, suggest the Home University equivalent and a match percentage, ' +
+      'and the course comes back to you for the final decision.</p></div>' +
+    '<div class="field" id="' + f('commentsWrap') + '"><label>Comments <span class="hint">required when declining; shown to the student</span></label>' +
+      '<textarea id="' + f('comments') + '"></textarea></div>' +
+    '</div>';
+}
+
+function facultyRow(c) {
+  return '<div class="course"><div class="row"><h3>' + esc(c.host_course_code) + ' - ' + esc(c.host_course_name) + '</h3>' +
+    '<span class="sp"></span><span class="pill ' + pillClass(c.status) + '">' + esc(c.status) + '</span></div>' +
+    '<div class="meta">Forwarded to ' + esc(c.faculty_email) + dotJoin(c.forward_note) + '</div></div>';
+}
+
+function decidedRow(c) {
+  var ok = c.status === P.CS.APPROVED;
+  return '<div class="course"><div class="row"><h3>' + esc(c.host_course_code) + ' - ' + esc(c.host_course_name) + '</h3>' +
+    '<span class="sp"></span><span class="pill ' + pillClass(c.status) + '">' + esc(c.status) + '</span></div>' +
+    (ok ? '<div class="meta">Home University equivalent <b>' + esc(c.home_course_code) + '</b> ' + esc(c.home_course_name) +
+      dotJoin(c.course_type, c.ger_area) + ' · grade required ' + esc(c.grade_required || P.gradeRemark) + '</div>' : '') +
+    '<div class="meta">' + esc(signedBy(c.hod_signature, '', /^uploaded/i.test(c.hod_sig_method || '') ? 'uploaded' : /^drawn/i.test(c.hod_sig_method || '') ? 'drawn' : 'typed',
+      c.hod_role === 'Designate' ? 'College/School Designate' : (c.hod_role === 'Assistant' ? 'Department Assistant' : 'Head of Department'))) +
+    dotJoin(c.decision_comments) + '</div></div>';
+}
+
+function render(d) {
+  if (!d) return;
+  D = d;
+  var s = d.submission;
+  $('who').textContent = s.student_name + ' · ' + s.student_id + ' · ' + s.host_university;
+
+  $('pending').innerHTML = d.pending.map(courseCard).join('');
+  show('decide', d.pending.length > 0);
+  show('already', d.pending.length === 0);
+  $('alreadyMsg').textContent = d.withFaculty.length
+    ? 'Nothing is waiting for you right now. You will get an email when the faculty review comes back.'
+    : d.decided.length
+      ? 'Every course from this student has a decision. No further action is needed.'
+      : 'There are no courses waiting for you on this link.';
+
+  show('decidedCard', d.decided.length + d.withFaculty.length > 0);
+  $('decided').innerHTML = d.withFaculty.map(facultyRow).join('') + d.decided.map(decidedRow).join('');
+  renderHistory('history', d.history);
+}
+
+// Show the Home University fields only for approvals, and the GER area only for GER courses.
+$('pending').addEventListener('change', function (e) {
+  var card = e.target.closest('[data-course]');
+  if (!card) return;
+  var i = card.dataset.i;
+  if (e.target.dataset.role === 'decision') {
+    show('c' + i + '_home', e.target.value === 'APPROVE');
+    show('c' + i + '_fwd', e.target.value === 'FORWARD');
+    show('c' + i + '_commentsWrap', e.target.value !== 'FORWARD');
+  }
+  if (e.target.dataset.role === 'type') show('c' + i + '_gerWrap', e.target.value === P.gerType);
+  if (e.target.dataset.role === 'type') show('c' + i + '_otherWrap', e.target.value === P.otherType);
+});
+
+$('submit').onclick = function () {
+  var items = Array.prototype.map.call(document.querySelectorAll('[data-course]'), function (card) {
+    var i = card.dataset.i, item = { course_row_id: card.dataset.course };
+    ['decision', 'comments', 'faculty_email', 'forward_note'].concat(HOME_FIELDS).forEach(function (k) { item[k] = val('c' + i + '_' + k); });
+    return item;
+  });
+  setErr('');
+  var sig = signatureOrError('signature');
+  if (!sig) return;
+  act('decideCourses', Q, items, sig).then(function (d) {
+    if (!d) return;
+    render(d);
+    setOk('Recorded ' + d.saved + ' decision(s). Students and any faculty members you forwarded to have been emailed.' +
+      (d.pending.length ? ' ' + d.pending.length + ' course(s) are still waiting for you below.' : ' Thank you.'));
+  });
+};
+
+load('getReview', Q).then(render, function () {});
+</script>
+</body></html>

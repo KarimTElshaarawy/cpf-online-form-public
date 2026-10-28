@@ -1,0 +1,199 @@
+<!DOCTYPE html><html><head><base target="_top"><?!= include('Styles') ?></head><body>
+<div class="brand"><div class="wrap"><img src="<?!= logoDataUri_() ?>" alt="Institution logo" width="327" height="36"></div></div>
+<header class="top"><div class="wrap">
+  <div class="eyebrow">International Exchange Office</div>
+  <h1>Course Permission Form - Outgoing Exchange</h1>
+</div></header>
+
+<div class="wrap">
+  <div id="err" class="err"></div>
+
+  <!-- Your forms: the signed-in student's existing forms (getMyForms in WebApp.gs only returns their own). -->
+<div id="myForms" class="card" style="display:none">
+  <h2>Your forms</h2>
+  <p class="muted">You already have the forms below. Open one to carry on with it. To go to a different university or semester, start a new form further down.</p>
+  <div id="myFormsList"></div>
+</div>
+
+<div id="intro" class="note">
+    Start here. You enter your details once, the Exchange Office checks the host university in Step I, then you add
+    your courses one at a time and send each to the relevant head of department. You can add, edit or
+    replace courses at any point until every course has a decision.
+  </div>
+
+  <div id="form">
+    <div class="card">
+      <h2>Your details</h2>
+      <div class="grid">
+        <div class="field"><label>Full name *</label><input id="student_name"></div>
+        <div class="field"><label>Student ID *</label><input id="student_id" placeholder="b00000000"></div>
+        <div class="field"><label>Home University email *</label><input id="student_email" type="email" placeholder="b00000000@example.edu"></div>
+        <div class="field"><label>Mobile *</label><input id="student_mobile" type="tel"></div>
+      </div>
+      <div class="grid3">
+        <div class="field"><label>Present college / school *</label><select id="college"></select></div>
+        <div class="field"><label>Present major *</label><input id="major"></div>
+        <div class="field"><label>Concentration *</label><input id="concentration" placeholder="e.g. Software Engineering, or None">
+      <div class="muted" style="font-size:12px;margin-top:4px">Note: if you do not have a concentration, type <b>None</b>.</div></div>
+        <div class="field"><label>Class *</label><select id="student_class"></select></div>
+        <div class="field"><label>Current semester * <span class="hint">e.g. Spring 2027</span></label><input id="current_semester"></div>
+        <div class="field"><label>Expected graduation *</label><input id="expected_graduation" placeholder="e.g. Spring 2028"></div>
+      </div>
+      <div class="grid">
+        <div class="field"><label>Earned credits before the semester abroad *
+          <span class="hint">minimum <span id="minc"></span></span></label>
+          <input id="credits_completed" type="number" min="0"></div>
+        <div class="field"><label>Cumulative GPA (CGPA) *
+          <span class="hint">out of 4.00, minimum <span id="ming"></span></span></label>
+          <input id="gpa" type="number" min="0" max="4" step="0.01" placeholder="e.g. 3.25"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Host university</h2>
+      <div class="grid">
+        <div class="field"><label>Name of host university * <span class="hint">choose from the list if it is there</span></label>
+          <input id="host_university" list="uniList" autocomplete="off"><datalist id="uniList"></datalist></div>
+        <div class="field"><label>Country *</label><input id="host_country"></div>
+        <div class="field"><label>Semester you will study there * <span class="hint">pick Fall or Spring, then type the year</span></label>
+<div style="display:flex;gap:10px;max-width:340px">
+<select id="hs_season" aria-label="Season"></select>
+<input id="hs_year" type="number" inputmode="numeric" step="1" placeholder="Year" aria-label="Year" style="max-width:130px">
+</div><input id="host_semesters" type="hidden"></div>
+        <div class="field"><label>Contact name at the host university *</label><input id="host_contact_name"></div>
+        <div class="field"><label>Contact email at the host university *</label><input id="host_contact_email" type="email"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Advisor and funding</h2>
+      <div class="grid">
+        <div class="field"><label>Academic advisor name *</label><input id="advisor_name"></div>
+        <div class="field"><label>Academic advisor email * <span class="hint">their @example.edu address; they sign Step III</span></label><input id="advisor_email" type="email"></div>
+        <div class="field"><label>Have you received a Home University financial grant or scholarship? *
+          <span class="hint">INCLUDE HERE: examples of your scholarships</span></label>
+          <select id="has_scholarship"><option value="">Select…</option><option>No</option><option>Yes</option></select></div>
+        <div class="field"><label>Are you sponsored by an external organization? *
+          <span class="hint">coordinated with your sponsorship office. INCLUDE HERE: examples of sponsors.
+          Get approval from the sponsor first before applying abroad.</span></label>
+          <select id="has_sponsor"><option value="">Select…</option><option>No</option><option>Yes</option></select></div>
+      </div>
+      <p class="muted">In Step III your advisor, your associate dean, Financial Grants and Scholarships (only if you
+        received a Home University financial grant or scholarship), the Sponsorship Manager (only if you are sponsored) and the Exchange Office sign, then you sign;
+        the Office of the Registrar signs last (Step IV). Steps that do not apply are recorded as N/A.</p>
+    </div>
+
+    <div class="card">
+      <h2>Conditions</h2>
+      <p class="muted" style="margin-top:0">Please read these conditions now so you know them before you start. You do not sign them here: you agree to them by signing once, at the end of Step III, and they are printed on your final signed PDF.</p>
+      <div id="intakeConds"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="go">Start my form</button>
+        <span class="muted">A link to your form will be emailed to you.</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="done" class="card" style="display:none">
+    <h2>Your form has been created</h2>
+    <p>Your reference is <b id="doneRef"></b>. We have also emailed a link to <b id="doneEmail"></b>, so you can always get back in.
+      The Exchange Office has been notified to complete Step I.</p>
+    <p style="margin-top:18px"><a id="doneLink" class="btn" href="#" target="_top" style="display:inline-block;text-decoration:none;padding:11px 20px;border-radius:7px">Open my form</a></p>
+  </div>
+
+  <p class="muted">Questions? <span id="exo"></span></p>
+</div>
+
+<?!= clientScript_(P) ?>
+<script>
+var FIELDS = ['student_name', 'student_id', 'student_email', 'student_mobile', 'college', 'major',
+  'concentration', 'student_class', 'current_semester', 'expected_graduation', 'credits_completed', 'gpa',
+  'host_university', 'host_country', 'host_semesters', 'host_contact_name', 'host_contact_email',
+  'advisor_name', 'advisor_email', 'has_scholarship', 'has_sponsor'];
+
+$('minc').textContent = P.minCredits;
+$('ming').textContent = Number(P.minGpa).toFixed(2);
+// Conditions shown for awareness only (Oct 15, 2026); the student agrees by signing at the end of Step III.
+$('intakeConds').innerHTML = conditionsHtml(P.conditions || []);
+
+// Lost link: list the signed-in student's own forms at the top. The server decides whose forms these
+// are from the Google sign-in alone; a failure just leaves the list hidden.
+run('getMyForms').then(function (list) {
+  if (!list || !list.length) return;
+  $('myFormsList').innerHTML = list.map(function (f) {
+    return '<div class="row" style="margin:10px 0;gap:10px;align-items:center;flex-wrap:wrap">' +
+      '<div><b>' + esc(f.university) + '</b> · ' + esc(f.semester) + (f.amendment ? ' · amendment ' + esc(f.amendment) : '') +
+      '<br><span class="muted">' + esc(f.ref) + ' · ' + esc(f.status) + (f.started ? ' · started ' + esc(f.started) : '') + '</span></div>' +
+      '<span class="sp"></span>' +
+      '<a class="btn sm" style="text-decoration:none" target="_top" href="' + esc(f.url) + '">Open</a></div>';
+  }).join('');
+  show('myForms');
+}, function () {});
+$('college').innerHTML = opts(P.colleges);
+$('student_class').innerHTML = opts(P.classes);
+
+// Semester abroad: a season and a year, joined into "Fall 2027" so every form uses the same wording.
+(function () {
+  var season = $('hs_season'), year = $('hs_year'), out = $('host_semesters');
+  var thisYear = new Date().getFullYear();
+  season.innerHTML = '<option value="">Season</option>' + (P.semesterNames || []).map(function (n) { return '<option>' + n + '</option>'; }).join('');
+  year.min = thisYear; year.max = 4096;
+  function join() {
+    var y = parseInt(year.value, 10);
+    var ok = season.value && y >= thisYear && y <= 4096;
+    // Academic year: the year typed is the start year ("Academic year 2027/2028"); Calendar year: "Calendar year 2027".
+    out.value = !ok ? '' : season.value === 'Academic year' ? 'Academic year ' + y + '/' + (y + 1) : season.value + ' ' + y;
+  }
+  season.onchange = function () { if (season.value && !year.value) year.value = thisYear; join(); };
+  year.oninput = join;
+  year.onchange = join;
+  year.addEventListener('wheel', function (e) {
+    if (document.activeElement !== year) return;
+    e.preventDefault();
+    year.value = Math.min(4096, Math.max(thisYear, (parseInt(year.value, 10) || thisYear) + (e.deltaY < 0 ? 1 : -1)));
+    join();
+  }, { passive: false });
+})();
+$('uniList').innerHTML = (P.universities || []).map(function (u) { return '<option value="' + esc(u) + '">'; }).join('');
+exoLink('exo');
+// Signed in with institution SSO: the email is the account they signed in with.
+if (P.me) { $('student_email').value = P.me; $('student_email').readOnly = true; }
+
+$('go').onclick = function () {
+  var p = {};
+  FIELDS.forEach(function (k) { p[k] = val(k); });
+  // Oct 15, 2026: every field is required (the server checks again), so the final PDF has no blanks.
+  var missing = FIELDS.filter(function (k) { return !String(p[k] == null ? '' : p[k]).trim(); });
+  if (missing.length) {
+    var labelOf = function (k) {
+      var el = $(k === 'host_semesters' ? 'hs_season' : k);
+      var field = el && el.closest('.field');
+      var label = field && field.querySelector('label');
+      return label ? String(label.childNodes[0].textContent).replace('*', '').trim() : k.replace(/_/g, ' ');
+    };
+    return setErr('Please fill in every field. Missing: ' + missing.map(labelOf).join(', ') + '.');
+  }
+  // Earned credits: a hard block (the server checks again).
+  var cr = String(p.credits_completed || '').trim();
+  if (!/^\d+(\.\d+)?$/.test(cr)) return setErr('Please enter your number of earned credits as a number (for example 60).');
+  if (Number(cr) < P.minCredits) {
+    return setErr('You need at least ' + P.minCredits + ' earned credits to go abroad. Please contact the Exchange Office (' +
+      P.exo + ') if you think this is wrong.');
+  }
+  // CGPA: a hard block too (the server checks again).
+  var g = String(p.gpa || '').trim();
+  if (!/^\d+(\.\d+)?$/.test(g) || Number(g) > 4) return setErr('Please enter your cumulative GPA (CGPA) as a number out of 4.00 (for example 3.25).');
+  if (Number(g) < Number(P.minGpa)) {
+    return setErr('You need a cumulative GPA (CGPA) of at least ' + Number(P.minGpa).toFixed(2) + ' to go abroad. Please contact the Exchange Office (' +
+      P.exo + ') if you think this is wrong.');
+  }
+  act('createSubmission', p).then(function (r) {
+    if (!r) return;
+    show('form', false); show('intro', false); show('done');
+    $('doneEmail').textContent = p.student_email;
+    $('doneLink').href = r.url;
+    $('doneRef').textContent = r.submission_id;
+  });
+};
+</script>
+</body></html>

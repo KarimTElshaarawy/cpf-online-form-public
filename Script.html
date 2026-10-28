@@ -1,0 +1,473 @@
+<script>
+/* Shared client helpers. P (page data) is defined just before this by clientScript_(). */
+
+function $(id) { return document.getElementById(id); }
+function val(id) { var e = $(id); return e ? (e.type === 'checkbox' ? e.checked : e.value) : ''; }
+function show(id, on) { $(id).style.display = on === false ? 'none' : ''; }
+
+function flash(id, msg) {
+  var e = $(id);
+  if (!e) return;
+  e.textContent = msg || '';
+  e.style.display = msg ? 'block' : 'none';
+  if (msg) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function setErr(msg) { flash('err', msg); }
+function setOk(msg) { flash('okmsg', msg); }
+
+function busy(on) {
+  document.querySelectorAll('button').forEach(function (b) { b.disabled = !!on; });
+}
+
+/**
+ * The browser looks up its own IP address once, so it can travel with a signature.
+ * It is an audit trail, not proof: the signed-in institution account is what identifies the signer.
+ * Page: P.captureIp / P.ipLookupUrl. If the lookup fails the server stores "not reported".
+ */
+var CLIENT_IP = '';
+var ipReady = Promise.resolve();
+if (P.captureIp && P.ipLookupUrl && window.fetch) {
+  ipReady = new Promise(function (done) {
+    var timer = setTimeout(done, 4000);
+    fetch(P.ipLookupUrl).then(function (r) { return r.text(); }).then(function (txt) {
+      txt = String(txt || '').trim();
+      if (txt.charAt(0) === '{') { try { txt = String(JSON.parse(txt).ip || ''); } catch (e) { txt = ''; } }
+      CLIENT_IP = txt.slice(0, 45);
+    }).catch(function () {}).then(function () { clearTimeout(timer); done(); });
+  });
+}
+
+/** Server calls that carry a signature, and how many arguments each takes before the IP. */
+var SIGN_CALLS = { submitStepOne: 3, decideCourses: 3, submitFacultyReview: 3, decideStage: 7, signSubmission: 3 };
+
+/** Says out loud that an IP address is kept with each signature. */
+function ipNotice() {
+  if (!P.captureIp) return;
+  Array.prototype.forEach.call(document.querySelectorAll('input.sig'), function (el) {
+    if (el.getAttribute('data-ipnote')) return;
+    el.setAttribute('data-ipnote', '1');
+    var p = document.createElement('p');
+    p.className = 'muted';
+    p.style.margin = '6px 0 0';
+    p.textContent = 'Your IP address and the time are recorded with your signature.';
+    el.parentNode.insertBefore(p, el.nextSibling);
+  });
+}
+ipNotice();
+document.addEventListener('DOMContentLoaded', ipNotice);
+window.addEventListener('load', ipNotice);
+
+/** Promise wrapper around google.script.run. Signing calls wait for the IP lookup and send it last. */
+function run(fn) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  var arity = SIGN_CALLS[fn];
+  return (arity ? ipReady : Promise.resolve()).then(function () {
+    if (arity) { while (args.length < arity) args.push(null); args.push(CLIENT_IP); }
+    return new Promise(function (resolve, reject) {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(function (e) {
+          reject(new Error(String(e && e.message ? e.message : e).replace(/^(Exception|Error):\s*/, '')));
+        })
+        [fn].apply(null, args);
+    });
+  });
+}
+
+/**
+ * Button action: clears messages, locks the buttons, calls the server,
+ * shows any error, always unlocks. Resolves with the server result
+ * (undefined on failure).
+ */
+function act(fn /*, args... */) {
+  setErr(''); setOk(''); busy(true);
+  return run.apply(null, arguments)
+    .catch(function (e) { setErr(e.message); })
+    .finally(function () { busy(false); });
+}
+
+/** Page load: shows #app on success, the error in #loading on failure. */
+function load(fn /*, args... */) {
+  return run.apply(null, arguments).then(function (d) {
+    show('loading', false); show('app');
+    return d;
+  }, function (e) {
+    $('loading').textContent = e.message;
+    throw e;
+  });
+}
+
+/** Reads a PDF from a file input into {name, mimeType, data(base64)}. */
+function readFile(inputEl) {
+  return new Promise(function (resolve, reject) {
+    var f = inputEl && inputEl.files && inputEl.files[0];
+    if (!f) return resolve(null);
+    if (f.type !== 'application/pdf') return reject(new Error('"' + f.name + '" is not a PDF.'));
+    if (f.size > P.maxUploadMb * 1024 * 1024) return reject(new Error('"' + f.name + '" is larger than ' + P.maxUploadMb + ' MB.'));
+    var r = new FileReader();
+    r.onload = function () { resolve({ name: f.name, mimeType: f.type, data: r.result.split(',')[1] }); };
+    r.onerror = function () { reject(new Error('Could not read ' + f.name)); };
+    r.readAsDataURL(f);
+  });
+}
+
+var ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ESC[c]; }); }
+
+function pillClass(status) {
+  var s = String(status || '').replace(/ .*/, '').toUpperCase();
+  return s === 'N/A' ? 'NA' : s;
+}
+
+function opts(list, selected) {
+  return '<option value="">Select…</option>' + list.map(function (o) {
+    return '<option' + (String(o) === String(selected) ? ' selected' : '') + '>' + esc(o) + '</option>';
+  }).join('');
+}
+
+function kvRows(pairs) {
+  return pairs.filter(function (p) { return p[1] !== '' && p[1] != null; })
+    .map(function (p) { return '<tr><td>' + esc(p[0]) + '</td><td><b>' + esc(p[1]) + '</b></td></tr>'; })
+    .join('');
+}
+
+function kvTable(pairs) { return '<table class="kv"><tbody>' + kvRows(pairs) + '</tbody></table>'; }
+
+/** " · a · b" for the non-empty values. */
+function dotJoin() {
+  return Array.prototype.filter.call(arguments, Boolean).map(function (v) { return ' · ' + esc(v); }).join('');
+}
+
+function exoLink(id) {
+  $(id).innerHTML = '<a href="mailto:' + esc(P.exo) + '">' + esc(P.exo) + '</a>';
+}
+
+/**
+ * "Signed by Jane Doe (College/School Designate) on 01 Oct 2026, 10:00 (drawn)". Plain text
+ * (escape it when building HTML). This line is ALL any page ever shows of a signature: a
+ * drawn picture is never sent to, or shown on, any page, and neither is an IP address
+ * (IPs stay in the Sheet only). role is optional.
+ */
+function signedBy(name, at, method, role) {
+  if (!name) return '';
+  // A drawn or uploaded signature given without a name keeps a plain label instead of one.
+  var unnamed = /^(Drawn|Uploaded) signature$/.test(name);
+  return (unnamed ? 'Signed' : 'Signed by ' + name) + (role ? ' (' + role + ')' : '') + (at ? ' on ' + at : '') +
+    (method ? ' (' + method + ')' : '');
+}
+
+/* ------------------------------------------------ Draw or Type signature
+ * mountSignature(id, label) turns <div id="..."></div> into: the signer's full name,
+ * a Type / Draw choice and, for Draw, a pad that works with a mouse, a pen or a finger
+ * (phones included), with a Clear button. signatureValue(id) returns what the server
+ * expects, { method, name, image }, or throws a message for the signer. The drawing
+ * leaves the page once, inside the signing call, and is never shown back anywhere.
+ */
+var SIGPADS = {};
+
+function signatureMode(id) {
+  var picked = document.querySelector('input[name="' + id + '_mode"]:checked');
+  return picked ? picked.value : 'typed';
+}
+
+function mountSignature(id, label) {
+  var box = $(id);
+  if (!box) return;
+  box.innerHTML =
+    '<div class="field"><label>' + esc(label || 'Electronic signature') + ' - your full name <span id="' + id + '_namereq">*</span></label>' +
+      '<input id="' + id + '_name" class="sig" placeholder="Full legal name" autocomplete="name"></div>' +
+    '<div class="sigmode" role="radiogroup" aria-label="How do you want to sign?">' +
+      '<label class="chk"><input type="radio" name="' + id + '_mode" value="typed" checked>' +
+        '<span><b>Type</b>: my typed full name is my signature</span></label>' +
+      '<label class="chk"><input type="radio" name="' + id + '_mode" value="drawn">' +
+        '<span><b>Draw</b>: I sign with my finger, a pen or the mouse</span></label>' +
+      '<label class="chk"><input type="radio" name="' + id + '_mode" value="uploaded">' +
+      '<span><b>Upload</b>: I use a saved picture of my signature (PNG or JPG)</span></label>' +
+    '</div>' +
+    '<div id="' + id + '_up" style="display:none"><input type="file" id="' + id + '_file" accept="image/png,image/jpeg">' +
+      '<img id="' + id + '_preview" alt="Your uploaded signature" style="display:none;max-height:70px;max-width:260px;margin-top:6px;background:#fff;border:1px solid #e6e1df;border-radius:6px;padding:4px">' +
+      '<div class="muted">Your picture is used only on the signed PDF.</div></div>' +
+    '<div id="' + id + '_pad" style="display:none">' +
+      '<canvas id="' + id + '_canvas" class="sigpad" aria-label="Signature pad"></canvas>' +
+      '<div class="row" style="margin-top:6px"><button type="button" class="btn sm sec" id="' + id + '_clear">Clear</button>' +
+        '<span class="muted">Sign inside the box. Your drawing is used only on the signed PDF.</span></div>' +
+    '</div>';
+
+  var canvas = $(id + '_canvas'), ctx = canvas.getContext('2d');
+  var pad = SIGPADS[id] = { canvas: canvas, ink: false, drawing: false };
+
+  // Sharp on high-density (phone) screens, capped so the PNG stays small.
+  function reset() {
+    var ratio = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round((canvas.clientWidth || 300) * ratio);
+    canvas.height = Math.round((canvas.clientHeight || 160) * ratio);
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111';
+    pad.ink = false;
+  }
+  function at(x, y) { var r = canvas.getBoundingClientRect(); return { x: x - r.left, y: y - r.top }; }
+  function start(p) { pad.drawing = true; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + 0.1, p.y + 0.1); ctx.stroke(); pad.ink = true; }
+  function move(p) { if (!pad.drawing) return; ctx.lineTo(p.x, p.y); ctx.stroke(); }
+  function end() { pad.drawing = false; }
+
+  if (window.PointerEvent) {
+    canvas.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+      start(at(e.clientX, e.clientY));
+    });
+    canvas.addEventListener('pointermove', function (e) { if (pad.drawing) { e.preventDefault(); move(at(e.clientX, e.clientY)); } });
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
+  } else {
+    // Older phones without pointer events.
+    var touch = function (e) { return at(e.touches[0].clientX, e.touches[0].clientY); };
+    canvas.addEventListener('touchstart', function (e) { e.preventDefault(); start(touch(e)); }, { passive: false });
+    canvas.addEventListener('touchmove', function (e) { e.preventDefault(); move(touch(e)); }, { passive: false });
+    canvas.addEventListener('touchend', end);
+    canvas.addEventListener('mousedown', function (e) { start(at(e.clientX, e.clientY)); });
+    canvas.addEventListener('mousemove', function (e) { move(at(e.clientX, e.clientY)); });
+    window.addEventListener('mouseup', end);
+  }
+
+  $(id + '_clear').onclick = reset;
+  // Upload: a saved PNG or JPG, scaled down and turned into a PNG here, then sent like a drawing.
+  $(id + '_file').onchange = function () {
+    var input = this;
+    pad.upload = null;
+    show(id + '_preview', false);
+    var f = input.files && input.files[0];
+    if (!f) return;
+    if (!/^image\/(png|jpeg)$/.test(f.type)) {
+      setErr('Please choose a PNG or JPG picture of your signature.');
+      input.value = '';
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var scale = Math.min(1, 500 / img.width, 170 / img.height);
+        var c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.width * scale));
+        c.height = Math.max(1, Math.round(img.height * scale));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        pad.upload = c.toDataURL('image/png');
+        $(id + '_preview').src = pad.upload;
+        show(id + '_preview', true);
+      };
+      img.onerror = function () { setErr('That picture could not be read. Please choose another PNG or JPG file.'); };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(f);
+  };
+  Array.prototype.forEach.call(document.getElementsByName(id + '_mode'), function (r) {
+    r.onchange = function () {
+      var drawn = signatureMode(id) === 'drawn';
+      show(id + '_pad', drawn);
+      show(id + '_up', signatureMode(id) === 'uploaded');
+      // Each method requires only its own input: the name only for Type.
+      $(id + '_namereq').textContent = signatureMode(id) === 'typed' ? '*' : '(optional)';
+      if (drawn) reset();   // the pad has a size only once it is visible
+    };
+  });
+  // Rotating a phone changes the box size; an empty pad simply follows it.
+  window.addEventListener('resize', function () { if (signatureMode(id) === 'drawn' && !pad.ink) reset(); });
+  ipNotice();
+}
+
+/** What the signing call sends: { method: 'typed' | 'drawn', name, image }. Throws a message for the signer. */
+function signatureValue(id) {
+  var name = String(val(id + '_name') || '').trim();
+  var mode = signatureMode(id);
+  var pad = SIGPADS[id];
+  // Oct 15, 2026: each method requires only its own input (Type: name, Draw: drawing, Upload: picture).
+  if (mode === 'drawn') {
+    if (!pad || !pad.ink) throw new Error('Please draw your signature in the box (or choose Type or Upload).');
+    return { method: 'drawn', name: name, image: pad.canvas.toDataURL('image/png') };
+  }
+  if (mode === 'uploaded') {
+    if (!pad || !pad.upload) throw new Error('Please choose a picture of your signature (or choose Type or Draw).');
+    return { method: 'uploaded', name: name, image: pad.upload };
+  }
+  if (!name) throw new Error('Please type your full name.');
+  return { method: 'typed', name: name };
+}
+
+/** signatureValue for a button handler: shows the problem and returns null instead of throwing. */
+function signatureOrError(id) {
+  try { return signatureValue(id); } catch (e) { setErr(e.message); return null; }
+}
+
+/** ' · suggested equivalent: CODE - Title' (the student's possible equivalent Home University course(s), Oct 2026), or ''. */
+function altCourseText(c) {
+  var code = String(c.alt_course_code || c.altCode || ''), name = String(c.alt_course_name || c.altName || '');
+  if (!code) return '';
+  return ' · suggested equivalent: ' + esc(code) + (name && name !== code ? ' - ' + esc(name) : '');
+}
+
+/** The paper form's numbered Conditions. */
+function conditionsHtml(list) {
+  // Oct 15, 2026: each condition's title (the text before the first ' - ') is shown in bold.
+  return list.map(function (c, i) {
+    var s = String(c), cut = s.indexOf(' - ');
+    var body = cut > -1 ? '<b>' + esc(s.slice(0, cut)) + ' -</b> ' + esc(s.slice(cut + 3)) : esc(s);
+    return '<div class="chk"><span>' + (i + 1) + '.</span><span>' + body + '</span></div>';
+  }).join('');
+}
+
+/** One Step III / IV line, in the paper form's wording. extra = HTML appended inside the item (e.g. a resend button). */
+function stageItem(st, extra) {
+  var cls = st.status === 'APPROVED' ? 'on' : st.status === 'DENIED' ? 'bad'
+          : st.status === 'N/A' ? 'na' : st.current ? 'cur' : '';
+  var state = st.status || (st.current ? 'Awaiting decision' : 'Not started');
+  return '<li><span class="dot ' + cls + '"></span><div><b>' + (st.step && st.step !== 'III' ? 'Step ' + esc(st.step) + ': ' : '') +
+    esc(st.block || st.label) + '</b><br>' +
+    '<span class="muted">' + esc(state) + (st.signature ? ' · ' + esc(signedBy(st.signature, st.at, st.method)) : '') +
+    (st.detail ? '<br>' + esc(st.detail) : '') +
+    (st.comments ? '<br>' + esc(st.comments) : '') + '</span>' + (extra || '') + '</div></li>';
+}
+
+/** The student's signature line, placed just before the Registrar (Step IV), as on the paper form. */
+function signatureItem(label, cls, text) {
+  return '<li><span class="dot ' + cls + '"></span><div><b>' + esc(label) + '</b><br>' +
+    '<span class="muted">' + text + '</span></div></li>';
+}
+
+/** Step III list with the student signature inserted before the first afterSignature stage. */
+function stageList(h, itemFor, sigItem) {
+  var out = [], placed = false;
+  h.stages.forEach(function (st) {
+    if (st.afterSignature && !placed) { out.push(sigItem); placed = true; }
+    out.push(itemFor(st));
+  });
+  if (!placed) out.push(sigItem);
+  return out.join('');
+}
+
+/**
+ * The shared "everything that happened before you" panel. Every approver
+ * page renders this so nobody has to sign blind.
+ */
+function renderHistory(elId, h) {
+  var el = $(elId);
+  if (!el || !h) return;
+  var s = h.student, o = h.stepOne;
+
+  var a = h.amendment;
+  var out = a
+    ? '<div class="note info"><b>Amendment ' + esc(a.no) + '</b> to form ' + esc(a.amends) +
+      '. Courses approved earlier are carried over with their original approval.' +
+      (a.added.length ? '<br>Added: <b>' + esc(a.added.join(', ')) + '</b>' : '') +
+      (a.removed.length ? '<br>Removed: <b>' + esc(a.removed.join(', ')) + '</b>' : '') + '</div>'
+    : '';
+
+  out += '<div class="card"><h2>Student</h2>' + kvTable([
+    ['Name', s.name + ' (' + s.id + ')'],
+    ['Home University email', s.email],
+    ['Mobile', s.mobile],
+    ['College / major', s.college + ' / ' + s.major + (s.concentration ? ', ' + s.concentration : '')],
+    ['Class', s.studentClass],
+    ['Current semester', s.currentSemester],
+    ['Earned credits', s.credits],
+    ['Cumulative GPA (CGPA)', s.gpa],
+    ['Expected graduation', s.expectedGraduation],
+    ['Host university', s.hostUniversity + (s.hostCountry ? ', ' + s.hostCountry : '')],
+    ['Semester(s) abroad', s.hostSemesters],
+    ['Host contact', s.hostContactName + (s.hostContactEmail ? ' (' + s.hostContactEmail + ')' : '')],
+    ['Advisor', s.advisor],
+    // The student's own answers at intake: they decide whether these two Step III lines apply.
+    ['Financial grant or scholarship', s.scholarship + (s.scholarship === 'Yes'
+      ? ' (Financial Grants and Scholarships signs)' : ' (Financial Grants and Scholarships: N/A)')],
+    ['Externally sponsored', s.sponsored + (s.sponsored === 'Yes'
+      ? ' (Sponsorship Manager signs)' : ' (Sponsorship Manager: N/A)')],
+    ['Reference', s.reference]
+  ]) + '</div>';
+
+  out += '<div class="card"><h2>Step I: Approval by Exchange Office</h2>' + (o.done
+    ? kvTable([
+        ['Accredited institution', o.accredited],
+        ['Study abroad agreement', o.agreement],
+        ['Accreditation for the major', o.majorAccreditation],
+        ['Comments / Special Requirements', o.comments],
+        ['Signature of Exchange Office', signedBy(o.signature, o.at, o.method) + ' · ' + o.by]
+      ])
+    : '<div class="note warn">Step I has not been completed yet.</div>') + '</div>';
+
+  var live = h.courses.filter(function (c) { return c.status !== P.CS.WITHDRAWN && c.status !== P.CS.SUPERSEDED; });
+  out += '<div class="card"><h2>Step II: Courses</h2>' + (live.length ? live.map(function (c) {
+    return '<div class="course"><div class="row"><h3>' + esc(c.hostCode) + ' - ' + esc(c.hostName) +
+      ' <span class="muted">(' + esc(c.hostCredits) + ' ' + esc(c.hostCreditSystem || 'cr') + (c.hostMode ? ' · ' + esc(c.hostMode) : '') + ')</span></h3><span class="sp"></span>' +
+      '<span class="pill ' + pillClass(c.status) + '">' + esc(c.status) + '</span></div>' +
+      (c.homeCode
+        ? '<div class="meta">Home University equivalent <b>' + esc(c.homeCode) + '</b> ' + esc(c.homeName) +
+          ' (' + esc(c.homeCredits) + ' cr)' + dotJoin(c.courseType, c.gerArea) +
+          ' · grade required ' + esc(c.gradeRequired || P.gradeRemark) + ' · prerequisites ' + esc(c.prereqsMet) + '</div>'
+        : '') +
+      '<div class="meta">' + esc(c.dept) +
+      (c.signature ? ' · ' + esc(signedBy(c.signature, c.at, c.method, c.role)) : c.status === P.CS.FACULTY ? ' · with a faculty member for review' : ' · awaiting decision') +
+      (c.carried ? ' · carried over, approved on ' + esc(c.approvedIn) : '') + '</div>' +
+      (c.facultySignature ? '<div class="meta">Faculty review' + dotJoin(c.facultyRec, c.matchPct + '% match') + ' · ' +
+        esc(signedBy(c.facultySignature, c.facultyAt, c.facultyMethod)) + '</div>' : '') +
+      (c.comments ? '<div class="note ' + (c.status === P.CS.DENIED ? 'bad' : 'ok') + '" style="margin:9px 0 0">' + esc(c.comments) + '</div>' : '') +
+      (c.syllabus ? '<div class="meta"><a href="' + esc(c.syllabus) + '" target="_blank">Host syllabus' + (c.syllabus2 ? ' 1' : '') + '</a>' +
+          (c.syllabus2 ? ' · <a href="' + esc(c.syllabus2) + '" target="_blank">Host syllabus 2</a>' : '') + altCourseText(c) + '</div>' : '') +
+      '</div>';
+  }).join('') : '<p class="muted">No courses yet.</p>') + '</div>';
+
+  out += '<div class="card"><h2>Steps III and IV: Signatures</h2><ul class="steps">' +
+    stageList(h, function (st) { return stageItem(st); },
+      signatureItem(h.studentSignatureLabel || 'Student', h.studentSignature ? 'on' : '',
+        h.studentSignature ? esc(signedBy(h.studentSignature, h.signedAt, h.studentMethod)) : 'Not yet signed')) +
+    '</ul></div>';
+
+  el.innerHTML = out;
+}
+
+/**
+ * The Home University-equivalent inputs for one course card (ids f('home_course_code') ...),
+ * prefilled from the course. Used by the HoD and faculty review pages.
+ */
+function homeFieldsHtml(f, c, courseTypes, gerAreas) {
+  var v = function (k) { return ' value="' + esc(c[k] || '') + '"'; };
+  var ger = c.course_type === P.gerType;
+  var other = c.course_type === P.otherType;
+  return '<div class="grid">' +
+    '<div class="field"><label>Equivalent Home University course code *</label><input id="' + f('home_course_code') + '" placeholder="e.g. ELE 340"' + v('home_course_code') + '></div>' +
+    '<div class="field"><label>Equivalent Home University course title *</label><input id="' + f('home_course_name') + '"' + v('home_course_name') + '></div>' +
+    '<div class="field"><label>Home University credits *</label><input id="' + f('home_credits') + '"' + v('home_credits') + '></div>' +
+    '<div class="field"><label>This course counts as *</label><select id="' + f('course_type') + '" data-role="type">' +
+      opts(courseTypes, c.course_type) + '</select></div>' +
+    '<div class="field" id="' + f('gerWrap') + '"' + (ger ? '' : ' style="display:none"') + '><label>GER program area *</label>' +
+      '<select id="' + f('ger_area') + '">' + opts(gerAreas, c.ger_area) + '</select></div>' +
+    '<div class="field" id="' + f('otherWrap') + '"' + (other ? '' : ' style="display:none"') + '><label>Please specify what this course counts as *</label>' +
+      '<input id="' + f('other_type') + '" placeholder="e.g. College Requirement" value="' + esc(other ? (c.ger_area || '') : '') + '"></div>' +
+    // Filled in by the head of department as on the paper form; prefilled with C, editable, may be left blank.
+    '<div class="field"><label>Grade required * <span class="hint">' + esc(P.gradeRemark) + '</span></label>' +
+      '<input id="' + f('grade_required') + '" placeholder="' + esc(P.gradeDefault) + '" value="' +
+      esc(c.grade_required || P.gradeDefault) + '"></div>' +
+    '<div class="field"><label>Are the Home University prerequisites met? *</label><select id="' + f('prereqs_met') + '">' +
+      opts(['Yes', 'No'], c.prereqs_met) + '</select></div>' +
+  '</div>';
+}
+
+var HOME_FIELDS = ['home_course_code', 'home_course_name', 'home_credits', 'course_type', 'ger_area', 'other_type',
+  'grade_required', 'prereqs_met'];
+
+/** The faculty member's review of a course, when there is one. */
+function facultyPanel(c) {
+  if (!c.faculty_at) return '';
+  return '<div class="note" style="margin:0 0 14px"><b>Faculty review</b> by ' + esc(c.faculty_signature) +
+    ' (' + esc(c.faculty_email) + ')<br><b>' + esc(c.faculty_recommendation) + '</b> · ' +
+    esc(c.faculty_match_pct) + '% match<br><span class="muted">Where it matches:</span> ' + esc(c.faculty_match_notes) +
+    (c.home_course_code ? '<br><span class="muted">Suggested Home University equivalent:</span> ' + esc(c.home_course_code) + ' ' + esc(c.home_course_name) : '') +
+    '</div>';
+}
+
+/** Hides the decision card and shows a message in its place. */
+function finish(msg) {
+  show('decide', false);
+  show('already');
+  $('alreadyMsg').textContent = msg;
+}
+</script>

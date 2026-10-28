@@ -1,0 +1,537 @@
+<!DOCTYPE html><html><head><base target="_top"><?!= include('Styles') ?></head><body>
+<div class="brand"><div class="wrap"><img src="<?!= logoDataUri_() ?>" alt="Institution logo" width="327" height="36"></div></div>
+<header class="top"><div class="wrap">
+  <div class="eyebrow">International Exchange Office</div>
+  <h1 id="title">Course Permission Form</h1>
+  <div id="who" class="eyebrow" style="margin-top:6px;opacity:.9"></div>
+</div></header>
+
+<div class="wrap">
+  <div id="err" class="err"></div>
+  <div id="okmsg" class="ok-msg"></div>
+  <div id="loading" class="center">Loading your form…</div>
+
+  <div id="app" style="display:none">
+    <div id="warn"></div>
+    <div id="version"></div>
+
+    <div class="card">
+      <h2>Where your form stands</h2>
+      <table class="kv"><tbody id="summary"></tbody></table>
+    </div>
+
+    <div id="amendCard"></div>
+
+    <div class="card" id="stepOneCard">
+      <h2>Step I: Approval by Exchange Office</h2>
+      <div id="stepOneBody"></div>
+    </div>
+
+    <div class="card" id="coursesCard">
+      <div class="row"><h2 style="margin:0">Step II: Your courses</h2><span class="sp"></span>
+        <button class="btn sm sec" id="addBtn">Add a course</button>
+        <button class="btn sm" id="sendAll">Send all for approval</button>
+      </div>
+      <p class="muted" id="coursesHelp" style="margin-top:6px"></p>
+      <div id="courses" style="margin-top:14px"></div>
+    </div>
+
+    <div class="card" id="gateCard">
+      <h2>Steps III and IV: Signatures</h2>
+      <div id="gateBody"></div>
+      <ul class="steps" id="stageList"></ul>
+    </div>
+  </div>
+
+  <!-- add / edit course: host side only -->
+  <div id="editor" class="card" style="display:none">
+    <h2 id="edTitle">Add a course</h2>
+    <div id="edNote" class="note" style="display:none"></div>
+    <div id="edApproved"></div>
+    <div class="grid">
+      <div class="field"><label>Course code(s) at the host university * <span class="hint">if two host courses together match one Home University course, enter both separated by a comma, e.g. MAT201, MAT202</span></label><input id="host_course_code" oninput="codesChanged()"></div>
+      <div class="field"><label>Course title(s) at the host university * <span class="hint">one per code, same order, separated by a comma, e.g. Calculus I, Calculus II</span></label><input id="host_course_name"></div>
+      <div class="field"><label>Number of credits at the host university *</label><input id="host_credits"></div>
+        <div class="field"><label>Which credit system are these credits? *</label>
+          <select id="host_credit_system_sel" onchange="creditSystemChanged()"></select>
+          <input id="host_credit_system_other" placeholder="Type the credit system" style="display:none;margin-top:6px"></div>
+        <div class="field"><label>Class mode *</label>
+          <select id="host_mode"></select></div>
+      <div class="field"><label>Which Home University department should review this? *
+        <span class="hint">the department that owns the equivalent Home University course</span></label>
+        <select id="dept_key"></select></div>
+      <div class="field"><label>Head of department's email *
+        <span class="hint">the email of the head of the department you chose, for example name@example.edu</span></label>
+        <input id="hod_email" type="email" autocomplete="off"></div>
+    </div>
+    <div class="field"><label><span id="syl1Label">Host university syllabus</span> (PDF) *</label>
+      <input id="host_syllabus" type="file" accept="application/pdf">
+      <span class="hint" id="sylNote"></span></div>
+    <div class="field" id="syl2Wrap" style="display:none"><label>Syllabus of host course 2 (PDF) *</label>
+      <input id="host_syllabus2" type="file" accept="application/pdf">
+      <span class="hint" id="syl2Note"></span></div>
+    <h3 style="margin:16px 0 4px">Suggested equivalent Home University course(s)</h3>
+    <p class="muted" style="margin:0 0 6px">The Home University course(s) you think this host course is equivalent to. Separate two with a comma (e.g. COE241, COE341). The head of department decides the final equivalent. If you are not sure, type <b>None</b> in both boxes.</p>
+    <div class="grid">
+      <div class="field"><label>Home University course code(s) *</label><input id="alt_course_code" placeholder="e.g. COE241, or None"></div>
+      <div class="field"><label>Home University course title(s) *</label><input id="alt_course_name" placeholder="e.g. Microcontrollers, or None"></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="saveCourse">Save course</button>
+      <button class="btn sec" id="saveSend">Save and send for approval</button>
+      <button class="btn sec" id="cancelEdit">Cancel</button>
+    </div>
+  </div>
+
+  <!-- shown after "Amend this form" -->
+  <div id="amendDone" class="card" style="display:none">
+    <h2>Your amendment has started</h2>
+    <p>Reference <b id="amendRef"></b>. Every approved course has been copied into it. Add or remove courses
+      there; your current form stays valid until the amendment is fully signed. We have also emailed you the link.</p>
+    <p style="margin-top:18px"><a id="amendLink" class="btn" href="#" target="_top"
+      style="display:inline-block;text-decoration:none;padding:11px 20px;border-radius:7px">Open my amendment</a></p>
+  </div>
+
+  <p class="muted">Questions? <span id="exo"></span></p>
+</div>
+
+<?!= clientScript_(P) ?>
+<script>
+var D = null, editing = null, replacing = null;
+var MAIN_CARDS = ['stepOneCard', 'coursesCard', 'gateCard', 'amendCard'];
+
+var HELP_NEW = 'You enter the host university course and its syllabus. The head of the Home University department decides ' +
+  'the equivalent Home University course, what it counts as, the minimum grade and the credits. Add all your courses first, ' +
+  'then use <b>Send all for approval</b>: every department gets its request at the same time, and each head of ' +
+  'department gets one email covering all of their courses.';
+var HELP_AMEND = 'Courses approved on your earlier form are carried over with their original approval and do not ' +
+  'need to be decided again. Add new courses and send them for approval, or remove any you no longer need ' +
+  '(you can put them back until you move on to Step III).';
+
+function render(d) {
+  if (!d) return;
+  D = d;
+  var s = d.submission, o = d.history.stepOne, v = d.version;
+  var locked = P.editable.indexOf(s.status) === -1;
+  var open = P.closed.indexOf(s.status) === -1;
+
+  $('title').textContent = v.amendmentNo ? 'Course Permission Form - Amendment ' + v.amendmentNo : 'Course Permission Form';
+  $('who').textContent = s.student_name + ' · ' + s.student_id + ' · ' + s.submission_id;
+  $('summary').innerHTML = kvRows([
+    ['Status', s.status],
+    ['Reference', s.submission_id],
+    ['Amends form', v.amends],
+    ['Host university', s.host_university + (s.host_country ? ', ' + s.host_country : '')],
+    ['Semester(s) abroad', s.host_semesters],
+    ['Scholarship / sponsored', s.has_scholarship + ' / ' + s.has_sponsor]
+  ]);
+  // Only for forms started before the 45-credit hard block (or edited in the Sheet): they cannot move on.
+  $('warn').innerHTML = d.creditProblem && open ? '<div class="note bad">' + esc(d.creditProblem) + '</div>' : '';
+  $('version').innerHTML = versionHtml(v, s);
+  $('amendCard').innerHTML = v.canAmend
+    ? '<div class="card"><h2>Need to change your courses?</h2>' +
+      '<p class="muted" style="margin:0 0 12px">Amending starts a new version of this form with every approved course ' +
+      'already on it. Add courses (only new ones go to their head of department), remove any you no longer need, then ' +
+      'you sign it and the Office of the Registrar completes Step IV. Step I and Step III are not done again. ' +
+      'This form stays valid until the amendment is fully signed. You can amend as ' +
+      'many times as you need.</p>' + btn('amend', '', 'Amend this form') + '</div>'
+    : '';
+
+  $('stepOneBody').innerHTML = o.done
+    ? '<div class="note ok">' + (v.amendmentNo ? 'Approved by the Exchange Office on your earlier form.' :
+        'Approved by the Exchange Office. You can send courses to heads of department.') + '</div>' +
+      kvTable([
+        ['Study abroad agreement', o.agreement],
+        ['Accreditation for your major', o.majorAccreditation],
+        ['Comments', o.comments],
+        ['Signed', signedBy(o.signature, o.at, o.method)]
+      ])
+    : '<div class="note warn">Waiting on the Exchange Office to check the host university. You can add courses ' +
+      'now, but they cannot be sent for approval until this is signed.</div>' +
+      (open ? '<div class="row" style="margin-top:11px">' + btn('resendS1', '', 'Send reminder now') + '</div>' : '');
+
+  $('coursesHelp').innerHTML = v.amendmentNo ? HELP_AMEND : HELP_NEW;
+  renderCourses(d.courses, locked, d.stepOneDone);
+  show('addBtn', !locked);
+  show('sendAll', !locked && d.stepOneDone);
+  renderGate(d, locked);
+}
+
+/** Banners about earlier and later versions of this form. */
+function versionHtml(v, s) {
+  var out = '';
+  if (v.amendmentNo) {
+    var parent = v.amendsUrl ? '<a href="' + esc(v.amendsUrl) + '">' + esc(v.amends) + '</a>' : '<b>' + esc(v.amends) + '</b>';
+    out += '<div class="note info">This is <b>amendment ' + esc(v.amendmentNo) + '</b> to form ' + parent + '. ' +
+      (s.status === P.ST.COMPLETED
+        ? 'It is fully signed and replaces that form.'
+        : s.status === P.ST.DENIED || s.status === P.ST.CANCELLED
+          ? 'It was not approved, so that form is still your approved course list.'
+          : 'That form stays your approved course list until this amendment is fully signed.') + '</div>';
+  }
+  if (v.child) {
+    var link = '<a href="' + esc(v.child.url) + '">' + esc(v.child.id) + '</a>';
+    if (v.child.status === P.ST.COMPLETED) {
+      out += '<div class="note ok">This form has been replaced by amendment ' + link +
+        '. That is your approved course list now.</div>';
+    } else if (v.child.status === P.ST.DENIED || v.child.status === P.ST.CANCELLED) {
+      out += '<div class="note warn">Amendment ' + link + ' was not approved, so this form is still your approved course list.</div>';
+    } else {
+      out += '<div class="note info">Amendment ' + link + ' is in progress. You can keep adding courses to it at any time. ' +
+        'Until it is fully signed, this form is still your approved course list.</div>';
+    }
+  }
+  return out;
+}
+
+function btn(act, cls, label, id) {
+  return '<button class="btn sm ' + cls + '" data-act="' + act + '" data-id="' + esc(id || '') + '">' + esc(label) + '</button>';
+}
+
+function courseActions(c, stepOneDone) {
+  if (c.carried_from) {
+    if (c.status === P.CS.APPROVED) return btn('wd', 'sec', 'Remove from my list', c.course_row_id);
+    if (c.status === P.CS.WITHDRAWN) return btn('restore', 'sec', 'Put back', c.course_row_id);
+    return '';
+  }
+  if (c.status === P.CS.DRAFT) {
+    return btn('edit', 'sec', 'Edit', c.course_row_id) +
+      (stepOneDone && c.hod_email_check !== 'MISMATCH' ? btn('send', 'sec', 'Send only this one', c.course_row_id) : '') +
+      btn('wd', 'sec', 'Remove', c.course_row_id);
+  }
+  if (c.status === P.CS.PENDING) {
+    return btn('resend', '', 'Send reminder now', c.course_row_id) +
+      btn('edit', 'sec', 'Edit', c.course_row_id) +
+      btn('wd', 'sec', 'Withdraw', c.course_row_id);
+  }
+  if (c.status === P.CS.FACULTY) {
+    return btn('resend', '', 'Send reminder now', c.course_row_id) +
+      btn('wd', 'sec', 'Withdraw', c.course_row_id);
+  }
+  if (c.status === P.CS.DENIED) {
+    return btn('fix', '', 'Fix and resubmit', c.course_row_id) +
+      btn('alt', 'sec', 'Choose a different course', c.course_row_id) +
+      btn('wd', 'sec', 'Withdraw', c.course_row_id);
+  }
+  return '';
+}
+
+function statusPill(c) {
+  if (c.carried_from && c.status === P.CS.WITHDRAWN) return '<span class="pill REMOVED">REMOVED</span>';
+  return '<span class="pill ' + pillClass(c.status) + '">' + esc(c.status) + '</span>';
+}
+
+function renderCourses(list, locked, stepOneDone) {
+  $('courses').innerHTML = !list.length
+    ? '<p class="muted">No courses yet. Use “Add a course” to start.</p>'
+    : list.map(function (c) {
+        var actions = locked ? '' : courseActions(c, stepOneDone);
+        return '<div class="course">' +
+          '<div class="row"><h3>' + esc(c.host_course_code) + ' - ' + esc(c.host_course_name) +
+          ' <span class="muted">(' + esc(c.host_credits) + ' ' + esc(c.host_credit_system || 'cr') + (c.host_mode ? ' · ' + esc(c.host_mode) : '') + ')</span></h3>' +
+          '<span class="sp"></span>' +
+          (c.carried_from ? '<span class="pill CARRIED">CARRIED OVER</span> ' : '') + statusPill(c) + '</div>' +
+          (c.home_course_code
+            ? '<div class="meta">Home University equivalent <b>' + esc(c.home_course_code) + '</b> ' + esc(c.home_course_name) +
+              ' (' + esc(c.home_credits) + ' cr)' + dotJoin(c.course_type, c.ger_area) +
+              ' · grade required ' + esc(c.grade_required || P.gradeRemark) + ' · prerequisites ' + esc(c.prereqs_met) + '</div>'
+            : '<div class="meta">The Home University equivalent is decided by ' + esc(c.dept_name) + '.</div>') +
+          (c.carried_from
+            ? '<div class="meta">Approved on form ' + esc(c.approved_in) + dotJoin(c.hod_signature) + '</div>' : '') +
+          (c.status === P.CS.FACULTY
+          ? '<div class="meta">The head of department forwarded this course to <b>' + esc(c.faculty_email) + '</b> for review.</div>' : '') +
+        (c.status === P.CS.DRAFT && c.hod_email_check === 'MISMATCH'
+          ? '<div class="note warn" style="margin:10px 0 0">The head of department email you entered (' + esc(c.hod_email_entered) +
+            ') is not the one on file for this department. The Exchange Office is checking it; you can send this course once it is decided.</div>' : '') +
+          (c.faculty_at && !c.carried_from
+            ? '<div class="meta">Faculty review: ' + esc(c.faculty_recommendation) + ' · ' + esc(c.faculty_match_pct) + '% match</div>' : '') +
+          '<div class="meta">' + esc(c.dept_name) + ' · ' + esc(c.hod_email) +
+          (c.host_syllabus_url ? ' · <a href="' + esc(c.host_syllabus_url) + '" target="_blank">syllabus' + (c.host_syllabus2_url || String(c.host_course_code).indexOf(',') > -1 ? ' 1' : '') + '</a>' : ' · <b>no syllabus attached</b>') +
+          (c.host_syllabus2_url ? ' · <a href="' + esc(c.host_syllabus2_url) + '" target="_blank">syllabus 2</a>'
+            : String(c.host_course_code).indexOf(',') > -1 ? ' · <b>second syllabus missing</b>' : '') +
+          (c.alt_course_code ? '<br>Suggested equivalent: ' + esc(c.alt_course_code) + (c.alt_course_name && c.alt_course_name !== c.alt_course_code ? ' - ' + esc(c.alt_course_name) : '') : '') +
+          '</div>' +
+          (c.decision_comments && !c.carried_from
+            ? '<div class="note ' + (c.status === P.CS.DENIED ? 'bad' : 'ok') + '" style="margin:10px 0 0">' +
+              '<b>' + esc(c.decision_by || 'Reviewer') + ':</b> ' + esc(c.decision_comments) + '</div>'
+            : '') +
+          (actions ? '<div class="row" style="margin-top:11px">' + actions + '</div>' : '') +
+          '</div>';
+      }).join('');
+}
+
+function renderGate(d, locked) {
+  var s = d.submission, h = d.history, v = d.version;
+  if (!locked) {
+    $('gateBody').innerHTML = d.gateReady
+      ? '<div class="note ok">Every course has a decision. When you are satisfied with your approved ' +
+        'list, lock it and start Step III. You can still come back and change it later if you need to.</div>' +
+        btn('gate', '', 'I am satisfied - proceed to Step III')
+      : '<div class="note">Step III opens once every course is resolved.<br><b>' + esc(d.gateReason) + '</b></div>';
+    $('stageList').innerHTML = '';
+    return;
+  }
+
+  $('gateBody').innerHTML =
+    (s.status === P.ST.COMPLETED
+      ? '<div class="note ok">This form is complete. A signed PDF has been emailed to you' +
+        (s.pdf_url ? ' - <a href="' + esc(s.pdf_url) + '" target="_blank">open it here</a>' : '') + '.</div>'
+      : s.status === P.ST.DENIED && d.restart && d.restart.ok
+        ? '<div class="note bad">This form was declined at <b>' + esc(d.restart.label) + '</b>' +
+          (d.restart.comments ? ': ' + esc(d.restart.comments) : '.') + '</div>' +
+          '<div class="note">If the decline was about your funding answers (for example you are not actually ' +
+          'sponsored), correct them below and restart. Every Step III and IV signature is asked for again, ' +
+          'starting with your advisor. Your approved courses stay.</div>' +
+          '<div class="grid">' +
+          '<div class="field"><label>Have you received a Home University financial grant or scholarship?</label>' +
+          '<select id="rs_scholarship">' + ['No', 'Yes'].map(function (o) { return '<option' + (o === s.has_scholarship ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></div>' +
+          '<div class="field"><label>Are you sponsored by an external organization?</label>' +
+          '<select id="rs_sponsor">' + ['No', 'Yes'].map(function (o) { return '<option' + (o === s.has_sponsor ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></div>' +
+          '</div>' +
+          '<label class="chk"><input type="checkbox" id="rs_courses"><span>I also need to change my courses first (back to Step II)</span></label>' +
+          '<div class="row" style="margin:10px 0 14px">' + btn('restart', '', 'Restart Steps III and IV') + '</div>'
+        : s.status === P.ST.DENIED
+        ? '<div class="note bad">This form was declined. The Exchange Office will contact you.</div>'
+        : s.status === P.ST.CANCELLED
+          ? '<div class="note bad">This form was cancelled by the Exchange Office.</div>'
+          : '<div class="note">Your course list is locked and moving through Step III.</div>') +
+    (v.canReopen
+      ? '<div class="row" style="margin:0 0 14px">' + btn('reopen', 'sec', 'Change my courses') +
+        '<span class="muted">Opens your course list again. Step III then starts over.</span></div>'
+      : '');
+
+  var signing = s.status === P.ST.SIGNING;
+  $('stageList').innerHTML = stageList(h,
+    function (st) {
+      var waiting = st.current && !st.status && s.status === P.ST.GATED;
+      return stageItem(st, waiting
+        ? '<div style="margin-top:8px">' + btn('resendStage', '', 'Send reminder now') + '</div>' : '');
+    },
+    signatureItem('Your signature', h.studentSignature ? 'on' : signing ? 'cur' : '',
+      h.studentSignature ? esc(signedBy(h.studentSignature, h.signedAt, h.studentMethod))
+      : signing ? '<a href="' + esc(d.signUrl) + '">Review and sign now</a>' : 'Not yet'));
+}
+
+/** Sends a reminder for whatever is waiting, then says where it went. */
+function resend(fn, id) {
+  var args = [fn, P.sid, P.t];
+  if (id) args.push(id);
+  act.apply(null, args).then(function (r) {
+    if (!r) return;
+    render(r.portal);
+    setOk('Reminder sent to ' + r.to + ' just now. Ask them to search their inbox for "' + P.subjectPrefix +
+      '" (the subject starts with "' + P.subjectPrefix + ' Reminder -") and to check Spam.');
+  });
+}
+
+/** Server call that returns a fresh portal, with an optional success message. */
+function update(msg, fn /*, args... */) {
+  act.apply(null, Array.prototype.slice.call(arguments, 1)).then(function (d) {
+    if (!d) return;
+    render(d);
+    if (msg) setOk(msg);
+  });
+}
+
+var ACTIONS = {
+  edit: function (c) { openEditor(c, null); },
+  fix: function (c) { openEditor(null, c, true); },
+  alt: function (c) { openEditor(null, c); },
+  send: function (c) { update('Sent to the head of department.', 'sendCourse', P.sid, P.t, c.course_row_id); },
+  resend: function (c) { resend('resendCourse', c.course_row_id); },
+  wd: function (c) {
+    var q = c.carried_from
+      ? 'Remove ' + c.host_course_code + ' from your approved list? You can put it back until you move on to Step III.'
+      : 'Remove ' + c.host_course_code + ' from your form?';
+    if (confirm(q)) update('', 'withdrawCourse', P.sid, P.t, c.course_row_id);
+  },
+  restore: function (c) { update(c.host_course_code + ' is back on your list.', 'restoreCourse', P.sid, P.t, c.course_row_id); },
+  resendS1: function () { resend('resendStepOne'); },
+  restart: function () {
+    var a = { has_scholarship: val('rs_scholarship'), has_sponsor: val('rs_sponsor'), changeCourses: val('rs_courses') };
+    if (!confirm('Restart Steps III and IV with these answers? Every Step III and IV signature will be asked for again.')) return;
+    update(a.changeCourses ? 'Your form is back in Step II. Make your changes, then use "I am satisfied - proceed to Step III".'
+      : 'Step III has restarted. Your advisor has been emailed.', 'restartAfterDecline', P.sid, P.t, a);
+  },
+  resendStage: function () { resend('resendStage'); },
+  gate: function () {
+    if (confirm('Lock your course list and start Step III? If you need to change it later, use "Change my courses" (Step III then starts over).')) {
+      act('confirmGate', P.sid, P.t).then(function (d) {
+        if (!d) return;
+        render(d);
+        var now = d.history.stages.filter(function (st) { return st.current; })[0];
+        setOk('Step III has started.' + (now ? ' ' + now.label + ' has been emailed.' : ''));
+      });
+    }
+  },
+  reopen: function () {
+    if (confirm('Open your course list again? Every Step III signature collected so far will be asked for again ' +
+        'once you move on, and whoever it is waiting on now will be told there is nothing to do for the moment.')) {
+      update('Your course list is open again. Make your changes, then use "I am satisfied - proceed to Step III".',
+        'reopenCourses', P.sid, P.t);
+    }
+  },
+  amend: function () {
+    if (!confirm('Start an amendment to this form? Every approved course is copied into it; this form stays ' +
+        'valid until the amendment is fully signed.')) return;
+    act('amendForm', P.sid, P.t).then(function (r) {
+      if (!r) return;
+      show('app', false);
+      $('amendRef').textContent = r.submission_id;
+      $('amendLink').href = r.url;
+      show('amendDone');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+};
+
+// One delegated listener for every generated button.
+$('app').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-act]');
+  if (!b || !ACTIONS[b.dataset.act]) return;
+  var c = D.courses.filter(function (x) { return x.course_row_id === b.dataset.id; })[0];
+  ACTIONS[b.dataset.act](c);
+});
+
+function editorOpen(on) {
+  show('editor', on);
+  MAIN_CARDS.forEach(function (id) { show(id, !on); });
+  if (on) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/** The courses already approved on this form, so the student does not add them again. */
+function approvedListHtml() {
+  var ok = D.courses.filter(function (c) { return c.status === P.CS.APPROVED; });
+  if (!ok.length) return '';
+  return '<div class="note ok"><b>Already approved on this form</b> <span class="muted">(no need to add these again)</span>' +
+    '<ul class="mini">' + ok.map(function (c) {
+      return '<li>' + esc(c.host_course_code) + ' - ' + esc(c.host_course_name) + ' &rarr; <b>' +
+        esc(c.home_course_code) + '</b> ' + esc(c.home_course_name) + '</li>';
+    }).join('') + '</ul></div>';
+}
+
+function openEditor(course, denied, fix) {
+  editing = course; replacing = denied;
+  var src = course || (fix ? denied : null);   // the details the form starts with
+  $('edTitle').textContent = course ? 'Edit course' : fix ? 'Fix and resubmit' : denied ? 'Different course' : 'Add a course';
+  show('edNote', !!denied);
+  if (denied) {
+    $('edNote').innerHTML = '<b>' + esc(denied.host_course_code) + '</b> was declined by ' + esc(denied.dept_name) + '.' +
+      (denied.decision_comments ? ' Reason: ' + esc(denied.decision_comments) : '') +
+      (fix
+        ? '<br>Fix what was asked (for example a clearer syllabus or the right department) and send it again. ' +
+          'It goes back for a fresh review.'
+        : '<br>The course you enter below replaces it.');
+  }
+  $('edApproved').innerHTML = course ? '' : approvedListHtml();
+  $('dept_key').innerHTML = '<option value="">Select…</option>' + D.departments.map(function (x) {
+    return '<option value="' + esc(x.key) + '"' + (src && src.dept_key === x.key ? ' selected' : '') + '>' +
+      esc(x.name) + ' (' + esc(x.college) + ')</option>';
+  }).join('');
+  // Credit system and delivery mode: the choices come from Config.gs (CREDIT_SYSTEMS, DELIVERY_MODES).
+  var opts = D.courseOptions || { modes: [], creditSystems: [] };
+  var sys = src ? (src.host_credit_system || '') : '';
+  var known = opts.creditSystems.indexOf(sys) > -1;
+  $('host_credit_system_sel').innerHTML = '<option value="">Select…</option>' + opts.creditSystems.concat(['Other']).map(function (x) {
+    return '<option value="' + esc(x) + '">' + esc(x) + '</option>';
+  }).join('');
+  $('host_credit_system_sel').value = sys ? (known ? sys : 'Other') : '';
+  $('host_credit_system_other').value = sys && !known ? sys : '';
+  creditSystemChanged();
+  // Class mode is always a dropdown: In-person or Online (falls back to these if the server sent none).
+  var modes = (opts.modes && opts.modes.length) ? opts.modes : ['In-person', 'Online'];
+  $('host_mode').innerHTML = '<option value="">Select…</option>' + modes.map(function (x) {
+    return '<option value="' + esc(x) + '">' + esc(x) + '</option>';
+  }).join('');
+  $('host_mode').value = src ? (src.host_mode || '') : '';
+  ['host_course_code', 'host_course_name', 'host_credits', 'alt_course_code', 'alt_course_name'].forEach(function (k) {
+    $(k).value = src ? (src[k] || '') : '';
+  });
+  $('host_syllabus').value = '';
+  $('host_syllabus2').value = '';
+  $('syl2Note').textContent = src && src.host_syllabus2_url
+    ? 'A second syllabus is already attached. Choose a file only if you want to replace it.'
+    : 'Required: the syllabus of the second host course.';
+  codesChanged();
+  $('hod_email').value = src ? (src.hod_email_entered || '') : '';
+  if (course && course.status === P.CS.PENDING) {
+    show('edNote');
+    $('edNote').textContent = 'This course is waiting for approval. Saving changes takes it back to draft, ' +
+      'so send it again afterwards and the head of department will review the new version.';
+  }
+  $('sylNote').textContent = src && src.host_syllabus_url
+    ? (fix ? 'The syllabus you sent before is kept. Choose a file only if you want to send a new one.'
+           : 'A syllabus is already attached. Choose a file only if you want to replace it.')
+    : 'Required before the course can be sent for approval.';
+  editorOpen(true);
+}
+
+/** Shows the free-text box when the student picks Other as the credit system. */
+function creditSystemChanged() {
+  var other = $('host_credit_system_sel').value === 'Other';
+  $('host_credit_system_other').style.display = other ? '' : 'none';
+}
+
+/** Two host course codes (comma-separated) need a second syllabus. */
+function codeCount() {
+  return String(val('host_course_code') || '').split(',').filter(function (s) { return s.trim(); }).length;
+}
+function codesChanged() {
+  var two = codeCount() >= 2;
+  show('syl2Wrap', two);
+  $('syl1Label').textContent = two ? 'Syllabus of host course 1' : 'Host university syllabus';
+}
+
+function save(andSend) {
+  setErr(''); setOk(''); busy(true);
+  Promise.all([readFile($('host_syllabus')), readFile($('host_syllabus2'))]).then(function (files) {
+    var file = files[0], file2 = files[1];
+    var c = {
+      host_course_code: val('host_course_code'),
+      host_course_name: val('host_course_name'),
+      host_credits: val('host_credits'),
+        host_credit_system: $('host_credit_system_sel').value === 'Other' ? val('host_credit_system_other') : $('host_credit_system_sel').value,
+        host_mode: val('host_mode'),
+      dept_key: val('dept_key'),
+    hod_email: val('hod_email'),
+    alt_course_code: val('alt_course_code'),
+    alt_course_name: val('alt_course_name')
+    };
+    if (file) c.host_syllabus = file;
+    if (file2 && codeCount() >= 2) c.host_syllabus2 = file2;
+    if (editing) c.course_row_id = editing.course_row_id;
+    return replacing
+      ? run('saveAlternative', P.sid, P.t, replacing.course_row_id, c, andSend)
+      : run('saveCourse', P.sid, P.t, c, andSend);
+  }).then(function (d) {
+    render(d);
+    editorOpen(false);
+    setOk(d && d.held
+      ? 'Course saved. The head of department email you entered is different from the one on file, so the Exchange Office ' +
+        'is checking it first. You will get an email when it is decided; then send the course from here.'
+      : andSend ? 'Saved and sent to the head of department.' : 'Course saved.');
+  }).catch(function (e) {
+    setErr(e.message);
+  }).finally(function () {
+    busy(false);
+  });
+}
+
+$('addBtn').onclick = function () { openEditor(null, null); };
+$('sendAll').onclick = function () {
+  act('sendAllDrafts', P.sid, P.t).then(function (d) {
+    if (!d) return;
+    render(d);
+    setOk('Sent ' + d.sent + ' course(s) to ' + d.hods + ' head(s) of department, one email each.' +
+      (d.noSyllabus ? ' ' + d.noSyllabus + ' draft(s) still need a syllabus before they can be sent.' : '') +
+      (d.held ? ' ' + d.held + ' draft(s) wait for the Exchange Office to check the head of department email you entered.' : ''));
+  });
+};
+$('saveCourse').onclick = function () { save(false); };
+$('saveSend').onclick = function () { save(true); };
+$('cancelEdit').onclick = function () { editorOpen(false); setErr(''); };
+exoLink('exo');
+
+load('getPortal', P.sid, P.t).then(render, function (e) { setErr(e.message); });
+</script>
+</body></html>

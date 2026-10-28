@@ -1,0 +1,65 @@
+<!DOCTYPE html><html><head><base target="_top"><?!= include('Styles') ?></head><body>
+<div class="brand"><div class="wrap"><img src="<?!= logoDataUri_() ?>" alt="Institution logo" width="327" height="36"></div></div>
+<header class="top"><div class="wrap">
+  <div class="eyebrow">International Exchange Office</div>
+  <h1 id="title">Step III approval</h1>
+</div></header>
+
+<div class="wrap">
+  <div id="err" class="err"></div>
+  <div id="loading" class="center">Loading…</div>
+
+  <div id="app" style="display:none">
+    <div id="history"></div>
+
+    <div class="card" id="decide">
+      <h2 id="block">Your decision</h2>
+      <p class="muted" id="note" style="display:none"></p>
+      <p id="stepFour" style="display:none"></p>
+      <div class="field" id="ptWrap" style="display:none"><label>Exchange Office use only - Student type and Study Abroad Program type *</label>
+        <input id="programType"></div>
+      <div class="field" id="regWrap" style="display:none"><label>Email of the Registrar who signs next *
+        <span class="hint">required to confirm. They get the form and syllabi and sign last.</span></label>
+        <input id="registrarEmail" type="email" placeholder="name@example.edu"></div>
+      <div class="field"><label>Decision *</label>
+        <select id="decision"><option value="">Select…</option>
+          <option value="APPROVE">Approve</option><option value="DENY">Decline</option></select></div>
+      <div class="field"><label>Comments <span class="hint">required when declining</span></label>
+        <textarea id="comments"></textarea></div>
+      <div id="signature"></div>
+      <button class="btn" id="submit">Submit decision</button>
+    </div>
+
+    <div class="card" id="already" style="display:none"><div class="note ok" id="alreadyMsg"></div></div>
+  </div>
+</div>
+
+<?!= clientScript_(P) ?>
+<script>
+load('getStageReview', P.sid, P.st, P.t).then(function (d) {
+  $('title').textContent = d.stage.title;
+  $('block').textContent = d.stage.block;
+  if (d.stage.note) { $('note').textContent = d.stage.note; show('note'); }
+  if (d.stepFourText) { $('stepFour').textContent = d.stepFourText; show('stepFour'); }
+  if (d.askRegistrarEmail) { $('registrarEmail').value = d.registrarEmail || ''; show('regWrap'); }
+    if (d.askProgramType) { $('programType').value = d.programType || ''; show('ptWrap'); }
+  renderHistory('history', d.history);
+  if (d.decided) {
+    finish('This step was already recorded as ' + (d.submission[d.stage.key + '_status'] || '') + '. No further action is needed.');
+  } else if (!d.isCurrent) {
+    finish('This form is not currently waiting on this step.');
+  }
+}, function () {});
+
+mountSignature('signature', 'Your signature');
+
+$('submit').onclick = function () {
+  setErr('');
+  var sig = signatureOrError('signature');
+  if (!sig) return;
+  act('decideStage', P.sid, P.st, P.t, val('decision'), val('comments'), sig,
+      { programType: val('programType'), registrarEmail: val('registrarEmail') })
+    .then(function (r) { if (r) finish('Recorded. Thank you.'); });
+};
+</script>
+</body></html>

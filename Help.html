@@ -1,0 +1,330 @@
+<style>
+/* Help & FAQ drawer. Added to every page by clientScript_() in WebApp.gs.
+   To change a question or answer, edit HELP below (plain text / simple HTML). */
+.hx-fab{position:fixed;right:18px;bottom:18px;z-index:50;display:flex;align-items:center;gap:8px;
+  background:var(--navy);color:#fff;border:0;border-radius:999px;padding:11px 17px 11px 13px;
+  font:inherit;font-weight:600;font-size:14px;cursor:pointer;box-shadow:0 6px 18px rgba(60,20,12,.25)}
+.hx-fab:hover{background:var(--navy-d)}
+.hx-fab .hx-q{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+  border-radius:50%;background:#fff;color:var(--navy);font-weight:800;font-size:13px}
+.hx-tip{position:absolute;right:0;bottom:calc(100% + 10px);width:230px;background:#22262b;color:#fff;
+  font-size:12.5px;font-weight:400;line-height:1.45;padding:9px 11px;border-radius:8px;text-align:left;
+  opacity:0;transform:translateY(4px);pointer-events:none;transition:opacity .15s,transform .15s}
+.hx-fab:hover .hx-tip,.hx-fab:focus-visible .hx-tip{opacity:1;transform:none}
+.hx-head-btn{margin-top:10px;background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.35);
+  border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:600;cursor:pointer}
+.hx-head-btn:hover{background:rgba(255,255,255,.24)}
+.hx-shade{position:fixed;inset:0;background:rgba(30,20,18,.35);z-index:60;opacity:0;pointer-events:none;transition:opacity .2s}
+.hx-drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100%);background:#fff;z-index:61;
+  display:flex;flex-direction:column;transform:translateX(100%);visibility:hidden;transition:transform .22s ease,visibility 0s linear .22s;
+  box-shadow:-10px 0 30px rgba(0,0,0,.12)}
+.hx-open .hx-shade{opacity:1;pointer-events:auto}
+.hx-open .hx-drawer{transform:none;visibility:visible;transition:transform .22s ease}
+.hx-top{background:var(--navy);color:#fff;padding:18px 20px 16px;position:relative}
+.hx-top h2{margin:4px 0 0;font-size:18px;color:#fff}
+.hx-top p{margin:6px 0 0;font-size:13px;opacity:.9;line-height:1.5}
+.hx-x{position:absolute;top:12px;right:12px;background:rgba(255,255,255,.15);color:#fff;border:0;
+  width:32px;height:32px;border-radius:50%;font-size:18px;line-height:1;padding:0;cursor:pointer}
+.hx-x:hover{background:rgba(255,255,255,.28)}
+.hx-search{padding:12px 20px;border-bottom:1px solid var(--line)}
+.hx-search input{padding:8px 11px;font-size:14px}
+.hx-body{flex:1;overflow-y:auto;padding:6px 20px 20px}
+.hx-sec{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--navy);font-weight:700;margin:18px 0 6px}
+.hx-body details{border-bottom:1px solid var(--line)}
+.hx-body summary{list-style:none;cursor:pointer;padding:11px 26px 11px 0;font-weight:600;font-size:14px;position:relative}
+.hx-body summary::-webkit-details-marker{display:none}
+.hx-body summary:after{content:'+';position:absolute;right:4px;top:9px;font-size:18px;color:var(--muted);font-weight:400}
+.hx-body details[open] summary:after{content:'-'}
+.hx-body summary:hover{color:var(--navy)}
+.hx-a{padding:0 0 13px;font-size:13.8px;line-height:1.6;color:#383230}
+.hx-a p{margin:0 0 8px}.hx-a ul{margin:4px 0 8px;padding-left:18px}.hx-a li{margin-bottom:3px}
+.hx-none{color:var(--muted);font-size:13.5px;padding:16px 0;display:none}
+.hx-foot{border-top:1px solid var(--line);padding:13px 20px;font-size:13px;color:var(--muted);background:#faf9f8}
+@media(max-width:640px){.hx-fab{right:12px;bottom:12px;padding:10px 14px 10px 11px}.hx-tip{display:none}}
+@media print{.hx-fab,.hx-drawer,.hx-shade,.hx-head-btn{display:none!important}}
+</style>
+<script>
+(function () {
+  var OFFICE_ADDR = P.exo;
+  var MAIL = '<a href="mailto:' + OFFICE_ADDR + '">' + OFFICE_ADDR + '</a>';
+  var TAG = P.subjectPrefix;
+  var DAYS = P.reminderDays || 2;
+  var MB = P.maxUploadMb;
+  var DOMAIN = P.facultyDomain || 'example.edu';
+
+  /* ---------- answers used by more than one role ---------- */
+  var ACCOUNT = ["It says the page belongs to a different account.",
+    "<p>The form only opens for the institution account it was sent to. If you have more than one institution account, switch using the Google account menu (top right) and reload. If the email address on the form is wrong, email " + MAIL + " and we'll fix it.</p>"];
+  var EMAILS = ["I can't find the emails from this form.",
+    "<p>They come from " + OFFICE_ADDR + " and the subject always starts with <b>" + TAG + "</b>. Search your inbox for either one, and check your Junk or Spam folder.</p>"];
+  var SIGNATURE = ["How do I sign? Is a typed name a real signature?",
+    "<p>Choose how to sign: <b>Type</b> (your typed full name is your signature), <b>Draw</b> (sign in the box with your finger, a pen or the mouse, <b>Clear</b> starts again) or <b>Upload</b> (choose a saved PNG or JPG picture of your signature). All three are valid for this form. Your full name is required only when you choose Type. The signed PDF shows one signature on each line: your typed name, your drawing or your picture, whichever you used. The date and your institution account are recorded too.</p>" +
+    "<p>A drawn or uploaded signature is never shown on any page or email: pages only say \"Signed by ... on ...\" and whether it was typed, drawn or uploaded. The picture appears only on the CPF PDF (the Step IV emails and the final signed PDF), and once the final signed PDF is sent it is deleted from our systems. The PDF is the permanent record.</p>"];
+  var MISTAKE = ["I made a mistake after submitting.",
+    "<p>Signed decisions can't be changed on the page. Email " + MAIL + " with the reference number shown at the top of the page and we'll correct it.</p>"];
+
+  /* ---------- per role ---------- */
+  var HELP = {
+    student: {
+      title: 'Help for students',
+      intro: 'Quick answers to common questions. Tap a question to open it.',
+      sections: [
+        ['Your form', [
+          ["What are the steps?",
+            "<ul><li><b>Step I:</b> the Exchange Office checks the host university.</li><li><b>Step II:</b> you add your host courses and each Home University department decides what they count as.</li><li><b>Step III:</b> your advisor, your associate dean, Financial Grants and Scholarships and the Sponsorship Manager (only if they apply) and the Exchange Office sign, in that order, and then <b>you</b> sign.</li><li><b>Step IV:</b> the Registration Officer checks and confirms, then the Office of the Registrar signs last.</li></ul><p>You then get the signed PDF and your host syllabi by email.</p>"],
+          ["I lost the link to my form.",
+            "<p>Open the CPF start page (the same link you used to start your form) while signed in with your institution account. Your forms are listed at the top under <b>Your forms</b>: press <b>Open</b> to carry on. Only you can see your forms there. You can also search your Home University inbox for <b>" + TAG + "</b>, or email " + MAIL + " with your student ID.</p>"],
+          ["Can I have more than one form?",
+            "<p>Yes, one for each host university and semester. If you already have a form for the same university and semester, carry on with that one instead of starting again.</p>"],
+          ["Which semester should I pick?",
+          "<p>Pick <b>Fall</b> or <b>Spring</b> and the year you will study abroad. Only Fall and Spring are offered. For anything else, contact the Exchange Office (" + MAIL + ").</p>"],
+        ["My form was declined. What now?",
+          "<p>Read the reason on your form. If it was declined in <b>Step I</b> (the host university), that form is closed; email " + MAIL + " about another university. If it was declined in <b>Step III or IV</b> and the reason is something you can correct, for example your scholarship or sponsorship answer was wrong, your form shows <b>Restart Steps III and IV</b>: correct your answers (and tick the box if you also need to change your courses) and restart. Your approved courses stay, and every Step III and IV signature is asked for again, starting with your advisor.</p>"],
+        ["Who should I enter as my academic advisor?",
+          "<p>Your own academic advisor's @" + DOMAIN + " email. They sign your form in Step III. Student accounts and exchange-office-signer.include-here@example.edu (Exchange Office) can't be entered. If you're not sure who your advisor is, check with your department.</p>"],
+        ["Is there a minimum number of credits or GPA?",
+            "<p>Yes. You need at least " + P.minCredits + " earned credits and a cumulative GPA (CGPA) of at least " + Number(P.minGpa).toFixed(2) + " before going abroad. If either is lower, the form cannot be started (and cannot move on to Step III). If you think a number is wrong, email " + MAIL + ".</p>"]
+        ]],
+        ['Courses', [
+          ["Which department should I choose?",
+            "<p>The Home University department that teaches the course you want it to count as. If you're not sure, ask your advisor or the Exchange Office before sending, because a course sent to the wrong department is usually declined.</p>"],
+          ["What head of department email should I enter?",
+          "<p>The Home University email of the head of the department you chose (for example from the department's page on your institution's website). If it matches the one the Exchange Office has on file, the course goes straight there. If it doesn't, you can still save the course, but you can't send it until the Exchange Office confirms the email or chooses the head on file; you'll get an email as soon as they decide.</p>"],
+        ["What do I enter for each host course?",
+          "<p>The course code, title and number of credits at the host university, which credit system those credits are in (US credits, ECTS, UK credits, or Other, where you type the system's name), and whether the course is taught online or in-person. Mark online courses as online: at most six online credit hours can transfer over your whole degree.</p>"],
+        ["What should I upload as the syllabus?",
+            "<p>The host university's official syllabus or course description, as a PDF of up to " + MB + " MB. More detail on topics and assessment means a faster decision. Upload only the syllabus, nothing personal.</p>"],
+          ["A course was declined. What now?",
+            "<p>Read the reason. If it can be fixed, use <b>Fix and resubmit</b> (below). If not, press <b>Choose a different course</b>, or <b>Withdraw</b> it if you don't need it.</p>"],
+          ["How do I fix and resubmit a declined course?",
+            "<p>Press <b>Fix and resubmit</b> on the course. It opens with your details already filled in. Change what the reviewer's note asks for, for example choose the correct department or upload a fuller syllabus, then send it. It goes back for a fresh review.</p>"],
+          ["A course was declined for another student. Can I still send it?",
+            "<p>Yes. Every request is reviewed on its own, so send it as normal.</p>"],
+          ["Nobody has replied yet.",
+            "<p>Reminders go out automatically every " + DAYS + " days. You can also press <b>Send reminder now</b> next to anything that's waiting, for example while you're at the person's office. Ask them to check Spam too.</p>"],
+          ["Can I change my courses later?",
+            "<p>Yes, at any time:</p><ul><li><b>Before Step III:</b> add, edit or withdraw courses on your form.</li><li><b>During Step III:</b> press <b>Change my courses</b>. Step III then starts again.</li><li><b>After your form is complete:</b> press <b>Amend this form</b>. Your approved courses are copied over and you add or remove courses. Only new courses go to their head of department. Step I and Step III are not done again (the Step III signatures are copied from your earlier form): you sign the amendment, then the Office of the Registrar completes Step IV. Your earlier form stays valid until the amendment is fully signed. You can amend as many times as you need, and there is no time limit: forms are never removed, so you can amend one whenever you need to, even semesters later.</li></ul>"]
+        ]],
+        ['Signing', [
+          ["When do I sign, and where is my final form?",
+            "<p>You sign only once, at the end of Step III. After the Exchange Office signs, you get an email asking you to sign: you read the conditions on that page, and by signing you agree to them. Nothing is agreed when you start your form. In Step IV the Registration Officer confirms the form and the Office of the Registrar signs last. Then the signed PDF and your host syllabi are emailed to you and the PDF is linked on your form. Remember to send the Registration Officer your visa (or passport if you don't need one) and drop any Home University courses you're registered in for that semester.</p>"],
+          ["Why does Financial Grants or Sponsorship say N/A?",
+            "<p>They only sign if you have a Home University scholarship or an outside sponsor.</p>"],
+          ["Who can see my information?",
+            "<p>Only the Exchange Office and the people who approve your form. Each of them sees your form details and the decisions made so far.</p>"],
+          SIGNATURE, EMAILS, ACCOUNT
+        ]]
+      ]
+    },
+
+    hod: {
+      title: 'Help for heads of department',
+      intro: 'For heads of department (or the College/School Designate). Tap a question to open it.',
+      sections: [
+        ['Reviewing courses', [
+          ["What do I need to do?",
+            "<p>For each course, open the syllabus and either approve it (enter the Home University equivalent, what it counts as, the grade required and whether prerequisites are met) or decline it with a reason. The grade required is prefilled with C; you can change it or leave it. Minimum grade C: a course passed with a grade below C will be rejected by the Registrar. One signature covers all the courses you decide. You can leave any course on <b>Decide later</b> and come back with the same link.</p>"],
+          ["Can a colleague review a course first?",
+            "<p>Yes. Choose <b>Forward to a faculty member for review</b> and enter their @" + DOMAIN + " email. They send back a suggested equivalent and a match percentage, and you make the final decision.</p>"],
+          ["The course isn't ours, or the syllabus isn't enough.",
+            "<p>Decline it and say why, for example \"Please send this to Physics\" or \"Need the weekly topics\". The student can then submit it again correctly.</p>"],
+          ["Why are some courses already approved?",
+            "<p>The student is amending a form that was already approved. Those courses keep their earlier approval; you only need to decide the new ones.</p>"],
+          ["I'm the College/School Designate. Can I sign?",
+            "<p>Yes, if the Exchange Office has listed you as the department's designate. You get the same emails and reminders as the head of department and can open the same link with your own institution account. Either of you may sign; the form records which of you did, and in which role.</p>"],
+          ["I'm the department assistant. Can I record the decision?",
+            "<p>Yes. The department assistant listed for the department can open the review page from the email and sign, just like the head of department. The signature is recorded as Department Assistant.</p>"],
+          ["Who sees my decision?",
+            "<p>The student and the Exchange Office. Your name and the date also appear on the final signed PDF.</p>"],
+          SIGNATURE, MISTAKE, EMAILS, ACCOUNT
+        ]]
+      ]
+    },
+
+    faculty: {
+      title: 'Help for faculty reviewers',
+      intro: 'A head of department asked for your opinion on a course. Tap a question to open it.',
+      sections: [
+        ['Your review', [
+          ["What do I need to do?",
+            "<p>For each course, open the syllabus, give a match percentage and a short note on where it matches, and recommend approving or declining. If you recommend approval, also suggest the Home University equivalent. The head of department makes the final decision.</p>"],
+          ["How do I choose the match percentage?",
+            "<p>Use your judgement on how much of the content and level matches the Home University course. There's no fixed cut-off.</p>"],
+          ["Who sees my review?",
+            "<p>The head of department and the Exchange Office. The student sees your recommendation and match percentage, so write your notes with that in mind.</p>"],
+          SIGNATURE, MISTAKE, EMAILS, ACCOUNT
+        ]]
+      ]
+    },
+
+    stage: {
+      title: 'Help for approvers',
+      intro: 'Tap a question to open it.',
+      sections: [
+        ['Signing off', [
+          ["What am I approving?",
+            "<p>The form as a whole, like your signature line on the paper form. The Exchange Office has already checked the host university and every course has been approved by its department; the page shows the full history. If it says <b>Amendment</b>, it's a new version of an approved form, and the changes are listed at the top.</p>"],
+          ["Something looks wrong.",
+          "<p>You can't change the courses at this stage. Decline with a clear reason, or email " + MAIL + " first if you'd like to discuss it. The student sees your reason. If it is something they can correct (for example their scholarship or sponsorship answer), they can correct it and restart Steps III and IV.</p>"],
+        ["I declined a form. Will it come back to me?",
+          "<p>Only if the student corrects it and restarts Steps III and IV. Every signature is then asked for again in order, so you'll get a new email when it's your turn. Your earlier decline stays in the Exchange Office's log.</p>"],
+          ["It says the form isn't waiting for me, or I got \"No action needed for now\".",
+            "<p>Signatures happen in order, and you'll get an email when it's your turn. \"No action needed\" means the student is changing their courses; you'll get a new request when it's ready.</p>"],
+          ["Why do some offices show N/A?",
+            "<p>Financial Grants only signs for students with a Home University scholarship, and Sponsorship only for sponsored students.</p>"],
+          SIGNATURE, MISTAKE, EMAILS, ACCOUNT
+        ]]
+      ]
+    },
+
+    exo: {
+      title: 'Help for the Exchange Office',
+      intro: 'Step I and day-to-day running. Tap a question to open it.',
+      sections: [
+        ['Step I', [
+          ["What does Step I check?",
+            "<p>That the host university is accredited, which agreement it falls under, and whether it has the appropriate accreditation for the student's major (Yes: tick every one that applies; or No, or N/A). The student and program type is filled in later, with the Exchange Office's Step III signature, as on the paper form. Declining needs a reason and ends the form. Students can add courses meanwhile, but can't send them until Step I is signed.</p>"]
+        ]],
+        ['Staff portal', [
+          ["How do I find a student's form?",
+            "<p>Open the main CPF link signed in with your institution staff account: it opens the <b>Exchange Office Staff portal</b>. Search by name, student ID, email, reference, university or major, or narrow the list by semester, year, host university, college, major and status. The tiles at the top filter by step. <b>Open form</b> shows the form exactly as the student sees it, in a new tab; forms waiting for Step I also have a <b>Step I</b> button.</p>"],
+          ["Who can open the staff portal?",
+            "<p>Only the accounts on the Exchange Office staff list (EXO_STAFF in Config.gs). Everyone else who opens the main link gets the normal student start page, and the staff list is checked again on the server every time the portal loads its data. To add or remove someone, edit EXO_STAFF and redeploy.</p>"],
+          ["Can I change a student's form from the portal?",
+            "<p>You can view every page and press <b>Send reminder now</b>, but you can only act on the Exchange Office steps (Step I and the Exchange Office signature in Step III). Courses, signatures and the other approvals stay with the student and the approvers. Staff who need a CPF for themselves use <b>Start a new form</b> at the bottom of the portal.</p>"]
+        ]],
+        ['Running the workflow', [
+          ["Whose name appears on Exchange Office signatures?",
+            "<p>Every Exchange Office signature (Step I and Step III) is shown as signed by <b>exchange-office-signer.include-here@example.edu</b> on the signed PDF and the form pages, whichever Exchange Office staff member signed. The real signer is still recorded on the <b>Submissions</b> tab and in the <b>Log</b>.</p>"],
+          ["Where can I see every form?",
+            "<p>In the CPF Google Sheet: <b>Submissions</b>, <b>Courses</b> and <b>Log</b> (who did what, and when, including every email sent, with a plain-English sentence in the <b>what_happened</b> column). The README in the Apps Script project explains everything else.</p>"],
+          ["A student lost their link.",
+            "<p>Send them the main CPF link (CPF menu &gt; Show web app link). When they open it signed in with their own institution account, their forms are listed at the top under <b>Your forms</b> with an <b>Open</b> button. Each person only ever sees their own forms there, staff included. You can also forward one of the form's emails from the exchange-office.include-here@example.edu inbox (Exchange Office is copied on every email), or take the reference from the Submissions tab and add <b>?ref=</b> and the reference to the main link: it only opens for that student's account (and Exchange Office staff).</p>"],
+          ["How do I cancel a form?",
+            "<p>Type <b>CANCELLED</b> in its status cell on the Submissions tab.</p>"],
+          ["A student typed a different head of department email.",
+          "<p>You get a <b>Confirm head of department email</b> email with both addresses. Open its link and press <b>Confirm</b> (the course goes to the email the student typed, and that person signs) or <b>Decline</b> (it goes to the head on file). The student can't send the course until you decide, and is emailed when you do. If the head has changed for good, also update the Departments tab. The Go-live check lists every course still waiting.</p>"],
+        ["A student restarted a form after a decline.",
+          "<p>A student whose form was declined in Step III or IV can correct their scholarship / sponsorship answers and restart Steps III and IV. You get an email showing what changed, the Log says the student corrected the answers and restarted Steps III and IV, and every Step III and IV signature is collected again. Step I declines cannot be restarted.</p>"],
+        ["A university name was typed differently.",
+            "<p>Add the other spelling to the university's row on the <b>Universities</b> tab (for example EU1). New forms then use the official name.</p>"],
+          ["A head of department or approver changed.",
+            "<p>Heads of department, their assistants (copied on every email; they may also sign the department review) and any College/School Designate are on the <b>Departments</b> tab; associate deans, the Registrar, Financial Grants and Sponsorship are in <b>Config.gs</b>.</p>"],
+          ["Who should have access to the CPF Sheet?",
+            "<p>Exchange Office staff only, because it holds student details. The approved-course catalog also lists each approval's student name and ID, so share it only with staff who may see student data (view only).</p>"],
+          SIGNATURE, EMAILS, ACCOUNT
+        ]]
+      ]
+    }
+  };
+
+  /* Short note at the top for each Step III office. */
+  var STAGE_NOTE = {
+    ADV: "You're signing as the student's <b>academic advisor</b>.",
+    DEAN: "You're signing as the student's <b>associate dean</b>. Your assistant is copied for information only and cannot sign for you.",
+    FIN: "You're signing for <b>Financial Grants and Scholarships</b>.",
+    SPON: "You're signing for <b>Sponsorship</b>.",
+    EXO: "This is the <b>Exchange Office</b> signature in Step III. Fill in <b>Exchange Office use only - Student type and Study Abroad Program type</b>; the student signs after you.",
+    RO: "You're the <b>Registration Officer</b> (Step IV), after the student. Check the form, then confirm with your signature. The email of the Registrar who signs last is already filled in; change it only if a different Registrar should sign.",
+    REG: "You're signing for the <b>Office of the Registrar</b> (Step IV), after the Registration Officer confirmed the form. Your signature is the last one and completes the form."
+  };
+
+  var ROLE_BY_PAGE = { Intake: 'student', Portal: 'student', Sign: 'student', Review: 'hod',
+    FacultyReview: 'faculty', Stage: 'stage', StepOne: 'exo', Staff: 'exo' };
+  var role = ROLE_BY_PAGE[P.page] || 'student';
+  var H = HELP[role];
+
+  function build() {
+    var intro = H.intro;
+    if (role === 'stage' && STAGE_NOTE[P.st]) intro = STAGE_NOTE[P.st] + ' Tap a question to open it.';
+    var body = H.sections.map(function (sec) {
+      return '<div class="hx-group"><div class="hx-sec">' + sec[0] + '</div>' +
+        sec[1].map(function (qa) {
+          return '<details><summary>' + qa[0] + '</summary><div class="hx-a">' + qa[1] + '</div></details>';
+        }).join('') + '</div>';
+    }).join('');
+
+    var root = document.createElement('div');
+    root.id = 'hx';
+    root.innerHTML =
+      '<button class="hx-fab" type="button" aria-haspopup="dialog" aria-controls="hx-drawer">' +
+        '<span class="hx-q">?</span>Help &amp; FAQ' +
+        '<span class="hx-tip" role="tooltip">Stuck, or wondering who sees your information? Click for quick answers.</span>' +
+      '</button>' +
+      '<div class="hx-shade"></div>' +
+      '<aside class="hx-drawer" id="hx-drawer" role="dialog" aria-modal="true" aria-labelledby="hx-title" aria-hidden="true">' +
+        '<div class="hx-top"><div class="eyebrow">Course Permission Form</div>' +
+          '<h2 id="hx-title">' + H.title + '</h2><p>' + intro + '</p>' +
+          '<button class="hx-x" type="button" aria-label="Close help">&times;</button></div>' +
+        '<div class="hx-search"><input type="search" placeholder="Search the questions…" aria-label="Search the questions"></div>' +
+        '<div class="hx-body">' + body + '<div class="hx-none">No question matches that. Try another word, or email ' + MAIL + '.</div></div>' +
+        '<div class="hx-foot">Still stuck? Email ' + MAIL +
+          (P.sid ? ' and mention your reference <b>' + esc(P.sid) + '</b>.' : '.') + '</div>' +
+      '</aside>';
+    document.body.appendChild(root);
+
+    var fab = root.querySelector('.hx-fab');
+    var drawer = root.querySelector('.hx-drawer');
+    var search = root.querySelector('.hx-search input');
+
+    function open() {
+      document.documentElement.classList.add('hx-open');
+      drawer.setAttribute('aria-hidden', 'false');
+      setTimeout(function () { search.focus(); }, 60);
+    }
+    function close() {
+      document.documentElement.classList.remove('hx-open');
+      drawer.setAttribute('aria-hidden', 'true');
+      fab.focus();
+    }
+    fab.onclick = open;
+    root.querySelector('.hx-x').onclick = close;
+    root.querySelector('.hx-shade').onclick = close;
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && document.documentElement.classList.contains('hx-open')) close();
+    });
+
+    search.addEventListener('input', function () {
+      var q = search.value.trim().toLowerCase();
+      var any = false;
+      root.querySelectorAll('.hx-group').forEach(function (g) {
+        var shown = 0;
+        g.querySelectorAll('details').forEach(function (d) {
+          var hit = !q || d.textContent.toLowerCase().indexOf(q) > -1;
+          d.style.display = hit ? '' : 'none';
+          d.open = !!q && hit;
+          if (hit) shown++;
+        });
+        g.style.display = shown ? '' : 'none';
+        if (shown) any = true;
+      });
+      root.querySelector('.hx-none').style.display = any ? 'none' : 'block';
+    });
+
+    // A second way in: a small button under the page title.
+    var head = document.querySelector('header.top .wrap');
+    if (head) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'hx-head-btn';
+      b.textContent = 'Questions? Help & FAQ';
+      b.onclick = open;
+      head.appendChild(b);
+    }
+    // The existing “Questions?” line at the bottom of some pages opens the panel too.
+    document.querySelectorAll('p.muted').forEach(function (p) {
+      if (p.textContent.trim().indexOf('Questions?') === 0) {
+        var a = document.createElement('a');
+        a.href = '#';
+        a.textContent = 'See the Help & FAQ';
+        a.onclick = function (e) { e.preventDefault(); open(); };
+        p.appendChild(document.createTextNode(' · '));
+        p.appendChild(a);
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build);
+  else build();
+})();
+</script>

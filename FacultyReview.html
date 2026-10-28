@@ -1,0 +1,129 @@
+<!DOCTYPE html><html><head><base target="_top"><?!= include('Styles') ?></head><body>
+<div class="brand"><div class="wrap"><img src="<?!= logoDataUri_() ?>" alt="Institution logo" width="327" height="36"></div></div>
+<header class="top"><div class="wrap">
+  <div class="eyebrow">International Exchange Office</div>
+  <h1>Step II: Faculty course review</h1>
+  <div id="who" class="eyebrow" style="margin-top:6px;opacity:.9"></div>
+</div></header>
+
+<div class="wrap">
+  <div id="err" class="err"></div>
+  <div id="okmsg" class="ok-msg"></div>
+  <div id="loading" class="center">Loading…</div>
+
+  <div id="app" style="display:none">
+    <div id="decide">
+      <div class="note">A head of department has asked for your review of the course(s) below. For each one, open
+        the syllabus, say how closely it matches the Home University course and where, and recommend approving or declining.
+        The head of department makes the final decision. Leave a course on <b>Decide later</b> to come back to it
+        with the same link.</div>
+      <div class="note warn" id="gradeNote"></div>
+      <div id="pending"></div>
+      <div class="card">
+        <h2>Sign</h2>
+        <div id="signature"></div>
+        <p class="muted">Signing and submitting records this review in your name, with a timestamp.</p>
+        <button class="btn" id="submit">Submit review</button>
+      </div>
+    </div>
+
+    <div class="card" id="already" style="display:none"><div class="note ok" id="alreadyMsg"></div></div>
+
+    <div class="card" id="reviewedCard" style="display:none">
+      <h2>Already reviewed</h2>
+      <div id="reviewed"></div>
+    </div>
+
+    <h2 style="margin:26px 0 12px">About this student's form</h2>
+    <div id="history"></div>
+  </div>
+</div>
+
+<?!= clientScript_(P) ?>
+<script>
+var Q = { ref: P.sid, fac: P.fac, t: P.t };
+$('gradeNote').textContent = P.gradeRejectNote;
+mountSignature('signature', 'Your signature');
+
+function courseCard(c, i) {
+  var f = function (name) { return 'c' + i + '_' + name; };
+  return '<div class="card" data-course="' + esc(c.course_row_id) + '" data-i="' + i + '">' +
+    '<div class="row"><h2 style="margin:0">' + esc(c.host_course_code) + ' - ' + esc(c.host_course_name) +
+    ' <span class="muted">(' + esc(c.host_credits) + ' ' + esc(c.host_credit_system || 'cr') + ' at host' + (c.host_mode ? ' · ' + esc(c.host_mode) : '') + ')</span></h2><span class="sp"></span>' +
+    (c.host_syllabus_url
+      ? '<a class="btn sm sec" style="text-decoration:none" href="' + esc(c.host_syllabus_url) + '" target="_blank">Open syllabus' + (c.host_syllabus2_url ? ' 1' : '') + '</a>' +
+          (c.host_syllabus2_url ? ' <a class="btn sm sec" style="text-decoration:none" href="' + esc(c.host_syllabus2_url) + '" target="_blank">Open syllabus 2</a>' : '')
+      : '<span class="muted">No syllabus attached</span>') + '</div>' +
+    '<div class="meta muted" style="margin:4px 0 14px">' + esc(c.dept_name) + altCourseText(c) +
+      (c.forward_note ? ' · note from the head of department: ' + esc(c.forward_note) : '') + '</div>' +
+    '<div class="grid">' +
+      '<div class="field"><label>Your recommendation</label>' +
+        '<select id="' + f('recommendation') + '" data-role="rec">' +
+        '<option value="">Decide later</option>' +
+        '<option value="APPROVE">Recommend approval</option>' +
+        '<option value="DENY">Recommend declining</option></select></div>' +
+      '<div class="field"><label>Match with the Home University course (%) *</label>' +
+        '<input id="' + f('match_pct') + '" type="number" min="0" max="100" placeholder="e.g. 85"></div>' +
+    '</div>' +
+    '<div class="field"><label>Where it matches (or does not) *</label>' +
+      '<textarea id="' + f('match_notes') + '" placeholder="Topics covered, depth, labs, prerequisites, what is missing"></textarea></div>' +
+    '<div id="' + f('home') + '" style="display:none">' +
+      '<p class="muted" style="margin:0 0 8px">The Home University equivalent you suggest (the head of department sees it pre-filled):</p>' +
+      homeFieldsHtml(f, c, D.courseTypes, D.gerAreas) + '</div>' +
+    '</div>';
+}
+
+function reviewedRow(c) {
+  return '<div class="course"><div class="row"><h3>' + esc(c.host_course_code) + ' - ' + esc(c.host_course_name) + '</h3>' +
+    '<span class="sp"></span><span class="pill ' + pillClass(c.status) + '">' + esc(c.status) + '</span></div>' +
+    '<div class="meta">' + esc(c.faculty_recommendation) + ' · ' + esc(c.faculty_match_pct) + '% match' +
+    dotJoin(c.faculty_signature) + '</div></div>';
+}
+
+var D = null;
+function render(d) {
+  if (!d) return;
+  D = d;
+  var s = d.submission;
+  $('who').textContent = s.student_name + ' · ' + s.student_id + ' · ' + s.host_university;
+  $('pending').innerHTML = d.pending.map(courseCard).join('');
+  show('decide', d.pending.length > 0);
+  show('already', d.pending.length === 0);
+  $('alreadyMsg').textContent = d.reviewed.length
+    ? 'Thank you - your review has gone to the head of department. No further action is needed.'
+    : 'There are no courses waiting for your review on this link.';
+  show('reviewedCard', d.reviewed.length > 0);
+  $('reviewed').innerHTML = d.reviewed.map(reviewedRow).join('');
+  renderHistory('history', d.history);
+}
+
+// Home University fields only when recommending approval; GER area only for GER courses.
+$('pending').addEventListener('change', function (e) {
+  var card = e.target.closest('[data-course]');
+  if (!card) return;
+  var i = card.dataset.i;
+  if (e.target.dataset.role === 'rec') show('c' + i + '_home', e.target.value === 'APPROVE');
+  if (e.target.dataset.role === 'type') show('c' + i + '_gerWrap', e.target.value === P.gerType);
+  if (e.target.dataset.role === 'type') show('c' + i + '_otherWrap', e.target.value === P.otherType);
+});
+
+$('submit').onclick = function () {
+  var items = Array.prototype.map.call(document.querySelectorAll('[data-course]'), function (card) {
+    var i = card.dataset.i, item = { course_row_id: card.dataset.course };
+    ['recommendation', 'match_pct', 'match_notes'].concat(HOME_FIELDS).forEach(function (k) { item[k] = val('c' + i + '_' + k); });
+    return item;
+  });
+  setErr('');
+  var sig = signatureOrError('signature');
+  if (!sig) return;
+  act('submitFacultyReview', Q, items, sig).then(function (d) {
+    if (!d) return;
+    render(d);
+    setOk('Recorded ' + d.saved + ' review(s). The head of department has been emailed.' +
+      (d.pending.length ? ' ' + d.pending.length + ' course(s) are still waiting for you below.' : ' Thank you.'));
+  });
+};
+
+load('getFacultyReview', Q).then(render, function () {});
+</script>
+</body></html>

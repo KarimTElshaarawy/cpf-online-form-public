@@ -1,0 +1,190 @@
+<style>
+:root{
+  --navy:#1f4e8c; --navy-d:#16396a; --ink:#1e2227; --muted:#756d6a;
+  --line:#e6e1df; --bg:#f6f4f3; --card:#ffffff;
+  --ok:#0f7b4f; --ok-bg:#e8f5ee; --bad:#b3261e; --bad-bg:#fdecea;
+  --warn:#8a5a00; --warn-bg:#fff5e0; --pend:#5b4f4b; --pend-bg:#f3efee;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+.wrap{max-width:960px;margin:0 auto;padding:0 16px 64px}
+.brand{background:#fff;border-bottom:1px solid var(--line)}
+.brand .wrap{padding:14px 16px}
+.brand img{display:block;height:36px;width:auto;max-width:100%}
+header.top{background:var(--navy);color:#fff;padding:22px 0 20px;margin-bottom:24px}
+header.top .wrap{padding-bottom:0}
+.eyebrow{font-size:11px;letter-spacing:1.1px;opacity:.8;text-transform:uppercase}
+h1{font-size:21px;margin:6px 0 0;font-weight:700}
+h2{font-size:16px;margin:0 0 14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;
+  padding:22px;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+@media(max-width:760px){.grid3{grid-template-columns:1fr}}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
+label{display:block;font-size:12.5px;font-weight:600;color:#443c3a;margin:0 0 5px}
+.hint{font-weight:400;color:var(--muted)}
+input,select,textarea{width:100%;padding:9px 11px;border:1px solid #d6cfcc;border-radius:7px;
+  font:inherit;background:#fff;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:2px solid #b9cbe8;border-color:var(--navy)}
+textarea{min-height:78px;resize:vertical}
+.field{margin-bottom:14px}
+button{font:inherit;font-weight:600;border:0;border-radius:7px;padding:10px 16px;cursor:pointer}
+.btn{background:var(--navy);color:#fff}
+.btn:hover{background:var(--navy-d)}
+.btn.sec{background:#f1eeed;color:#332c2a}
+.btn.sec:hover{background:#e6e1df}
+.btn.ok{background:var(--ok)}
+.btn.bad{background:var(--bad)}
+.btn.sm{padding:6px 11px;font-size:13px}
+button[disabled]{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sp{flex:1}
+.pill{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;
+  letter-spacing:.3px}
+.pill.APPROVED{background:var(--ok-bg);color:var(--ok)}
+.pill.DENIED{background:var(--bad-bg);color:var(--bad)}
+.pill.DRAFT{background:var(--warn-bg);color:var(--warn)}
+.pill.PENDING{background:var(--pend-bg);color:var(--pend)}
+.pill.WITH{background:#eef2fb;color:#2f4a8a}
+.pill.WITHDRAWN,.pill.SUPERSEDED,.pill.NA{background:#f0f1f3;color:#857d7a}
+.course{border:1px solid var(--line);border-radius:9px;padding:15px;margin-bottom:12px;background:#fff}
+.course h3{margin:0;font-size:15px}
+.course .meta{color:var(--muted);font-size:13px;margin-top:3px}
+.note{background:#eaf0f8;border-left:3px solid var(--navy);padding:11px 14px;border-radius:0 7px 7px 0;
+  font-size:13.5px;margin:0 0 16px}
+.note.warn{background:var(--warn-bg);border-color:#c98a00}
+.note.bad{background:var(--bad-bg);border-color:var(--bad)}
+.note.ok{background:var(--ok-bg);border-color:var(--ok)}
+.kv{width:100%;border-collapse:collapse;font-size:14px}
+.kv td{padding:5px 12px 5px 0;vertical-align:top}
+.kv td:first-child{color:var(--muted);white-space:nowrap;width:1%}
+.steps{list-style:none;padding:0;margin:0}
+.steps li{display:flex;gap:11px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)}
+.steps li:last-child{border-bottom:0}
+.dot{width:9px;height:9px;border-radius:50%;background:#d2cbc8;margin-top:7px;flex:0 0 9px}
+.dot.on{background:var(--ok)}.dot.cur{background:#c98a00}.dot.bad{background:var(--bad)}
+.dot.na{background:#d2cbc8;box-shadow:inset 0 0 0 2px #fff,0 0 0 2px #d2cbc8}
+.muted{color:var(--muted);font-size:13px}
+.err{background:var(--bad-bg);color:var(--bad);padding:10px 13px;border-radius:7px;
+  font-size:13.5px;margin-bottom:14px;display:none}
+.ok-msg{background:var(--ok-bg);color:var(--ok);padding:10px 13px;border-radius:7px;
+  font-size:13.5px;margin-bottom:14px;display:none}
+.center{text-align:center;padding:40px 0;color:var(--muted)}
+a{color:var(--navy)}
+.sig{font-family:"Segoe Script","Brush Script MT",cursive;font-size:19px}
+fieldset{border:1px solid var(--line);border-radius:9px;padding:14px;margin:0 0 16px}
+legend{font-size:12.5px;font-weight:700;color:var(--navy);padding:0 6px}
+.chk{display:flex;gap:9px;align-items:flex-start;font-size:13.5px;margin-bottom:8px;font-weight:400}
+.chk input{width:auto;margin-top:3px}
+.note.info{background:#eef2fb;border-color:#2f4a8a}
+.pill.CARRIED{background:#eef2fb;color:#2f4a8a}
+.pill.REMOVED{background:#f0f1f3;color:#857d7a}
+.sigmode{margin:0 0 10px}.sigmode .chk{margin-bottom:5px}
+.sigpad{display:block;width:100%;max-width:560px;height:170px;background:#fff;border:1px dashed #b9b0ad;
+  border-radius:8px;touch-action:none;cursor:crosshair;-webkit-user-select:none;user-select:none}
+ul.mini{margin:6px 0 0;padding-left:18px;font-size:13px}
+ul.mini li{margin-bottom:2px}
+</style>
+
+
+<style>
+/* ===== Dark mode (toggle button, bottom of Styles.html). Follows the device's setting until the user picks one. =====
+   Only the web pages change. Signed PDFs, emails and the signature pad stay as they were. */
+html[data-theme="dark"]{
+  color-scheme:dark;
+  --navy:#3a6fb5; --navy-d:#2a5590; --ink:#efeae8; --muted:#a69d9a;
+  --line:#3a312e; --bg:#151110; --card:#211b19;
+  --ok:#4cc38a; --ok-bg:#12281f; --bad:#ff8a80; --bad-bg:#33181a;
+  --warn:#f0b445; --warn-bg:#33270d; --pend:#cfc5c2; --pend-bg:#2c2523;
+}
+html[data-theme="dark"] header.top{background:#16294a}
+html[data-theme="dark"] a{color:#9db7f0}
+html[data-theme="dark"] label{color:#d8d0cd}
+html[data-theme="dark"] legend{color:#9db7f0}
+html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="dark"] textarea{
+  background:#2a2321;border-color:#4a403d;color:var(--ink)}
+html[data-theme="dark"] input:focus,html[data-theme="dark"] select:focus,html[data-theme="dark"] textarea:focus{
+  outline-color:#34527f;border-color:#6c8fe0}
+html[data-theme="dark"] .btn.sec{background:#2f2826;color:#eee6e3}
+html[data-theme="dark"] .btn.sec:hover{background:#3a312e}
+html[data-theme="dark"] .btn.ok{background:#1f8f5f}
+html[data-theme="dark"] .btn.bad{background:#c0392f}
+/* Link buttons (Open form, Open my form...) keep white text in dark mode: the pink link colour above
+   was winning over .btn and made them look faded (Oct 19, 2026). */
+html[data-theme="dark"] a.btn,html[data-theme="dark"] a.btn:hover{color:#fff}
+html[data-theme="dark"] a.btn.sec,html[data-theme="dark"] a.btn.sec:hover{color:#eee6e3}
+html[data-theme="dark"] .pill.WITH,html[data-theme="dark"] .pill.CARRIED{background:#1b2740;color:#9db7f0}
+html[data-theme="dark"] .pill.WITHDRAWN,html[data-theme="dark"] .pill.SUPERSEDED,
+html[data-theme="dark"] .pill.NA,html[data-theme="dark"] .pill.REMOVED{background:#2a2b2e;color:#a39b98}
+html[data-theme="dark"] .course{background:var(--card)}
+html[data-theme="dark"] .note{background:#1b2740}
+html[data-theme="dark"] .note.warn{background:var(--warn-bg)}
+html[data-theme="dark"] .note.bad{background:var(--bad-bg)}
+html[data-theme="dark"] .note.ok{background:var(--ok-bg)}
+html[data-theme="dark"] .note.info{background:#1b2740;border-color:#6c8fe0}
+html[data-theme="dark"] .dot{background:#5a4f4b}
+html[data-theme="dark"] .dot.on{background:var(--ok)}
+html[data-theme="dark"] .dot.cur{background:#c98a00}
+html[data-theme="dark"] .dot.bad{background:var(--bad)}
+html[data-theme="dark"] .dot.na{background:#5a4f4b;box-shadow:inset 0 0 0 2px var(--card),0 0 0 2px #5a4f4b}
+html[data-theme="dark"] .hx-drawer{background:var(--card)}
+html[data-theme="dark"] .hx-a{color:var(--ink)}
+/* The signature pad stays white on purpose: the ink is dark and the pad is saved as the signature image. */
+html[data-theme="dark"] .sigpad{background:#fff}
+/* The logo bar stays white so the logo is readable. */
+html[data-theme="dark"] .brand{background:#fff}
+.themebtn{position:fixed;top:12px;right:12px;z-index:55;width:38px;height:38px;padding:0;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  background:rgba(255,255,255,.92);color:#5b4f4b;border:1px solid rgba(0,0,0,.18);
+  box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.themebtn:hover{background:#fff}
+.themebtn svg{width:20px;height:20px;display:block}
+html[data-theme="dark"] .themebtn{background:#2a2321;color:#f5c542;border-color:#4a403d}
+html[data-theme="dark"] .themebtn:hover{background:#3a312e}
+@media print{.themebtn{display:none}}
+</style>
+<script>
+(function(){
+  var KEY='cpf-theme', root=document.documentElement;
+  function getSaved(){ try{ return localStorage.getItem(KEY); }catch(e){ return null; } }
+  function setSaved(v){ try{ localStorage.setItem(KEY,v); }catch(e){} }
+  // Oct 2026: with no saved choice the page follows the device (dark when the phone or computer
+  // is in dark mode, and it switches live). Pressing the sun/moon button saves a choice that wins.
+  var media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  var saved = getSaved();
+  var theme = saved==='dark' || saved==='light' ? saved : (media && media.matches ? 'dark' : 'light');
+  root.setAttribute('data-theme',theme);
+  var MOON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+  var SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+  function paint(btn){
+    var dark = root.getAttribute('data-theme')==='dark';
+    btn.innerHTML = dark ? SUN : MOON;
+    btn.title = dark ? 'Switch to light mode' : 'Switch to dark mode';
+    btn.setAttribute('aria-label', btn.title);
+  }
+  function init(){
+    if(document.getElementById('themeToggle')) return;
+    var btn=document.createElement('button');
+    btn.type='button'; btn.id='themeToggle'; btn.className='themebtn';
+    paint(btn);
+    btn.onclick=function(){
+      var next = root.getAttribute('data-theme')==='dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme',next);
+      setSaved(next);
+      paint(btn);
+    };
+    document.body.appendChild(btn);
+    // The device switches between light and dark (e.g. at sunset): follow it, unless a choice was saved.
+    function follow(e){
+      if(getSaved()) return;
+      root.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+      paint(btn);
+    }
+    if(media && media.addEventListener) media.addEventListener('change', follow);
+    else if(media && media.addListener) media.addListener(follow);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+})();
+</script>

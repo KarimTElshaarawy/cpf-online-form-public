@@ -1,0 +1,49 @@
+<!DOCTYPE html><html><head><base target="_top"><?!= include('Styles') ?></head><body>
+<div class="brand"><div class="wrap"><img src="<?!= logoDataUri_() ?>" alt="Institution logo" width="327" height="36"></div></div>
+<header class="top"><div class="wrap">
+  <div class="eyebrow">International Exchange Office</div>
+  <h1>Sign your course permission form</h1>
+</div></header>
+
+<div class="wrap">
+  <div id="err" class="err"></div>
+  <div id="loading" class="center">Loading…</div>
+
+  <div id="app" style="display:none">
+    <div id="history"></div>
+
+    <div class="card" id="decide">
+      <h2>Conditions</h2>
+      <div id="conds"></div>
+      <p style="margin-top:12px"><b>By signing, you agree to the conditions above and confirm that the information on this form is accurate.</b></p>
+      <div id="signature" style="margin-top:12px"></div>
+      <p class="muted">After you sign, <span class="next"></span></p>
+      <button class="btn" id="submit">Sign and send</button>
+    </div>
+
+    <div class="card" id="already" style="display:none"><div class="note ok" id="alreadyMsg"></div></div>
+  </div>
+</div>
+
+<?!= clientScript_(P) ?>
+<script>
+document.querySelectorAll('.next').forEach(function (e) { e.textContent = P.afterSignature; });
+mountSignature('signature', 'Signature of Student');
+
+load('getSignPage', P.sid, P.t).then(function (d) {
+  renderHistory('history', d.history);
+  $('conds').innerHTML = conditionsHtml(d.conditions);
+  if (d.done) finish('This form is complete. A signed PDF has been emailed to you.');
+  else if (!d.ready) $('decide').innerHTML = '<div class="note">Your form is not ready to sign yet - Step III is still in progress.</div>';
+}, function () {});
+
+$('submit').onclick = function () {
+  setErr('');
+  var sig = signatureOrError('signature');
+  if (!sig) return;
+  act('signSubmission', P.sid, P.t, sig).then(function (r) {
+    if (r) finish('Signed. ' + P.afterSignature.charAt(0).toUpperCase() + P.afterSignature.slice(1));
+  });
+};
+</script>
+</body></html>
